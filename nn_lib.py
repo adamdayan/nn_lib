@@ -98,7 +98,7 @@ class SigmoidLayer(Layer):
         return 1 / (1 + np.exp(array))
 
     def diff_sigmoid(self, array):
-        return (np.multiply(sigmoid(array), (1 - sigmoid(array))))
+        return (np.multiply(self.sigmoid(array), (1 - self.sigmoid(array))))
 
     def forward(self, x):
         #######################################################################
@@ -146,7 +146,7 @@ class ReluLayer(Layer):
 
         self._cache_current = x
 
-        return reLU(x)
+        return self.reLU(x)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -157,7 +157,7 @@ class ReluLayer(Layer):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        return np.multiply(grad_z, diff_reLU(self._cache_current))
+        return np.multiply(grad_z, self.diff_reLU(self._cache_current))
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -299,8 +299,6 @@ class MultiLayerNetwork(object):
                     self_layers.append(ReluLayer())
                 elif activations[l] == "sigmoid":
                     self._layers.append(SigmoidLayer())
-                else:
-                    pass
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -466,7 +464,7 @@ class Trainer(object):
         order = np.random.permutation(input_dataset.shape[0])
 
         shuffled_inputs = input_dataset[order,:]
-        shuffled_targets = target_dataset[order,:]
+        shuffled_targets = target_dataset[order]
 
         return (shuffled_inputs, shuffled_targets)
         #######################################################################
@@ -606,6 +604,7 @@ def example_main():
     net = MultiLayerNetwork(input_dim, neurons, activations)
 
     dat = np.loadtxt("iris.dat")
+    print(dat)
     np.random.shuffle(dat)
 
     x = dat[:, :4]
