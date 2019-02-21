@@ -95,7 +95,11 @@ class SigmoidLayer(Layer):
         self._cache_current = None
 
     def sigmoid(self, array):
-        return 1 / (1 + np.exp(array))
+        #print("Original")
+        #print(array)
+        #print("Sigmoided")
+        #print(1 / (1 + np.exp(-array)))
+        return 1 / (1 + np.exp(-array))
 
     def diff_sigmoid(self, array):
         return (np.multiply(self.sigmoid(array), (1 - self.sigmoid(array))))
@@ -292,15 +296,19 @@ class MultiLayerNetwork(object):
         #######################################################################
         self._layers = []
 
+        self._layers.append(LinearLayer(input_dim, neurons[0]))
+        
         for l in range(len(neurons)):
             if l == 0:
-                self._layers.append(LinearLayer(input_dim, neurons[l]))
+                self._layers.append(LinearLayer(neurons[0], neurons[l]))
             else:
                 self._layers.append(LinearLayer(neurons[l-1], neurons[l]))
-                if activations[l - 1] == "relu":
-                    self._layers.append(ReluLayer())
-                elif activations[l - 1] == "sigmoid":
-                    self._layers.append(SigmoidLayer())
+
+            if activations[l] == "relu":
+                self._layers.append(ReluLayer())
+            elif activations[l] == "sigmoid":
+                self._layers.append(SigmoidLayer())
+                
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -531,6 +539,11 @@ class Trainer(object):
         #######################################################################
         output = self.network.forward(input_dataset)
         loss = self._loss_layer.forward(output, target_dataset)
+        #print("pred")
+        #print(np.round(output,3))
+        #print("true")
+        #print(target_dataset)
+
         
         return loss
         #######################################################################
@@ -602,7 +615,7 @@ class Preprocessor(object):
 def example_main():
     input_dim = 4
     neurons = [16, 3]
-    activations = ["relu", "identity"]
+    activations = ["sigmoid", "identity"]
     net = MultiLayerNetwork(input_dim, neurons, activations)
 
     dat = np.loadtxt("iris.dat")
