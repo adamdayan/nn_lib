@@ -104,7 +104,7 @@ class SigmoidLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
+      
         self._cache_current = x
 
         return self.sigmoid(x)
@@ -133,17 +133,16 @@ class ReluLayer(Layer):
     def __init__(self):
         self._cache_current = None
 
-    def reLU(array):
+    def reLU(self, array):
         return np.maximum(0, array)
 
-    def diff_reLU(array):
-        np.where(array > 0, 1, 0)
+    def diff_reLU(self, array):
+        return np.where(array > 0, 1, 0)
 
     def forward(self, x):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
         self._cache_current = x
 
         return self.reLU(x)
@@ -156,7 +155,7 @@ class ReluLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
+        
         return np.multiply(grad_z, self.diff_reLU(self._cache_current))
 
         #######################################################################
@@ -209,6 +208,7 @@ class LinearLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+  
         self._cache_current = x
         
         weighted_sum_matrix = np.matmul(x, self._W) + self._b
@@ -258,6 +258,8 @@ class LinearLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+        #print(self._b[0,0])
+        #print(self.grad_W_current)
         self._W = self._W - (learning_rate * self.grad_W_current)
         self._b = self._b - (learning_rate * self.grad_b_current)
         #######################################################################
@@ -295,9 +297,9 @@ class MultiLayerNetwork(object):
                 self._layers.append(LinearLayer(input_dim, neurons[l]))
             else:
                 self._layers.append(LinearLayer(neurons[l-1], neurons[l]))
-                if activations[l] == "relu":
-                    self_layers.append(ReluLayer())
-                elif activations[l] == "sigmoid":
+                if activations[l - 1] == "relu":
+                    self._layers.append(ReluLayer())
+                elif activations[l - 1] == "sigmoid":
                     self._layers.append(SigmoidLayer())
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -604,7 +606,6 @@ def example_main():
     net = MultiLayerNetwork(input_dim, neurons, activations)
 
     dat = np.loadtxt("iris.dat")
-    print(dat)
     np.random.shuffle(dat)
 
     x = dat[:, :4]
