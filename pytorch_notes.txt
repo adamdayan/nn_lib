@@ -40,6 +40,7 @@ fake batch dimension.
 --> OR,
     use an optimizer - see - https://pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html#update-the-weights
 
-
+# Exampe of GPU support
+- https://github.com/pytorch/examples/blob/master/mnist/main.py
 
 
