@@ -64,7 +64,9 @@ class TorchTrainer():
 
         if optimizer == "sgd":
             self.optimizer = optim.SGD(self.network.parameters(), lr=self.learning_rate)
-        
+        elif optimizer == "adam":
+            self.optimizer = optim.Adam(self.network.parameters(), lr=self.learning_rate)
+
         # Clear training loss metadata from any previous training runs
         self.epochs_w_loss_measure = []
         self.training_losses = []
@@ -231,6 +233,7 @@ def train():
         learning_rate=learning_rate,
         loss_fun=loss_fun,
         shuffle_flag=shuffle_flag,
+        optimizer="adam"
     )
 
     trainer.train(x_train_pre, y_train)
