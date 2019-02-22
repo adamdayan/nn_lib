@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import matplotlib.pyplot as plt
 
 from nn_lib import (
     MultiLayerNetwork,
@@ -62,6 +63,11 @@ class TorchTrainer():
         self.loss_fun = loss_fun
         self.shuffle_flag = shuffle_flag
 
+        if self.loss_fun == "mse":
+            self.loss_criterion = nn.MSELoss()
+        elif self.loss_fun == "cross_entropy":
+            self.loss_criterion = nn.CrossEntropyLoss()
+        
         if optimizer == "sgd":
             self.optimizer = optim.SGD(self.network.parameters(), lr=self.learning_rate)
         elif optimizer == "adam":
@@ -97,7 +103,7 @@ class TorchTrainer():
         cut_points = np.arange(self.batch_size, input_dataset.shape[0], self.batch_size)
         return np.split(input_dataset, cut_points), np.split(target_dataset, cut_points)
 
-    def train(self, input_dataset, target_dataset):
+    def train(self, input_dataset, target_dataset, input_dataset_val, target_dataset_val):
 
         # Clear training loss metadata from any previous training runs
         self.epochs_w_loss_measure = []
@@ -119,6 +125,8 @@ class TorchTrainer():
         # Start outer training loop for epoch
         for epoch in tqdm(range(1, self.nb_epoch + 1)):
 
+            self.network.train()  # Sets the model back to training mode
+
             # Start inner training loop forwards and backwards pass for each batch
             for idx, batch_input in enumerate(batched_input):
 
@@ -126,30 +134,52 @@ class TorchTrainer():
                 batch_output = self.network.forward(batch_input)
 
                 # Compute loss
-                criterion = nn.MSELoss()
                 batch_target = torch.from_numpy(batched_target[idx]).float()
-                batch_loss = criterion(batch_output, batch_target)
+                batch_loss = self.loss_criterion(batch_output, batch_target)
 
                 # Backprop
                 self.network.zero_grad()
                 batch_loss.backward()
 
                 # Update weights
-                # self.optimizer.zero_grad()
                 self.optimizer.step()
                 
-
             if epoch % (self.nb_epoch / 100) == 0:
-                print("==== Loss stats for epoch " + str(epoch) + " ====")
-                print("Training loss = " + str(batch_loss))
-                print(batch_loss.grad_fn)
+                training_loss = self.eval_loss(input_dataset, target_dataset)
+                validation_loss = self.eval_loss(input_dataset_val, target_dataset_val)
+
+                self.epochs_w_loss_measure.append(epoch)
+                self.training_losses.append(training_loss)
+                self.validation_losses.append(validation_loss)
+                # self.training_accuracies = []
+                # self.validation_accuracies = []
+
+                if epoch % (self.nb_epoch / 20) == 0:
+                    tqdm.write("==== Loss stats for epoch " + str(epoch) + " ====")
+                    tqdm.write("Training loss = " + str(training_loss))
+                    tqdm.write("Validation loss = " + str(validation_loss))
 
 
     def eval_loss(self, input_dataset, target_dataset):
-        pass
+        """
+        Calculates loss from the network 
+        NB: turns off dropout and gradient caching as not required when performing an eval
+        """
 
+        with torch.no_grad():  # Stops autograd engine
+
+            # Deactivates dropout layers
+            self.network.eval() 
+
+            # Forward pass
+            output_tensor = self.network.forward(input_dataset)
+
+            # Calculate loss
+            target_tensor = torch.from_numpy(target_dataset).float()
+            loss = self.loss_criterion(output_tensor, target_tensor)
+
+            return loss.item()
     
-
 
 def split_train_val_test(dataset, last_feature_idx):
 
@@ -221,7 +251,7 @@ def train():
     # Add the network to a trainer and train
     # TODO: add to a tuple or something more secure (link it with the hyperparameter optimiser)
     batch_size = 8
-    nb_epoch = 1000
+    nb_epoch = 100
     learning_rate = 0.01
     loss_fun = "mse"
     shuffle_flag = True
@@ -236,10 +266,34 @@ def train():
         optimizer="adam"
     )
 
-    trainer.train(x_train_pre, y_train)
+    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
 
+    # Evaluate results
+    print("Final train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
+    print("Final validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
 
-    # Evaluate results 
+    # Plot learning curves
+    # to check how well model is training (e.g. is there overfitting)
+    plt.figure(figsize=(20,10))
+    plt.suptitle("Loss and accuracy vs epochs for " + loss_fun)
+
+    # Description of the hyperparams
+    hyperparams_text = "Hyperparameters: \n " + \
+                       "- lr = " + str(learning_rate) + \
+                       "\n - batch_size = " + str(batch_size) + \
+                       "\n - loss function = " + loss_fun + \
+                       "\n - number of epochs = " + str(nb_epoch)
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    plt.figtext(0.75, 0.75, hyperparams_text, bbox=props)
+
+    # Plot loss vs number of epochs
+    plt.plot(trainer.epochs_w_loss_measure, trainer.training_losses)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.validation_losses)
+    plt.legend(['training', 'validation'], loc='upper left')
+    plt.xlabel("Number of epochs")
+    plt.ylabel("Loss (" + loss_fun + ")")
+
+    plt.savefig(loss_fun + "_loss_plot.png")
     
     # out = network.forward(dataset
     
