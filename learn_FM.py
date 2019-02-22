@@ -1,5 +1,6 @@
 import collections
 
+from tqdm import tqdm
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
@@ -40,7 +41,7 @@ class SequentialNet(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-class Trainer():
+class TorchTrainer():
 
     def __init__(self,
                  network,
@@ -57,12 +58,62 @@ class Trainer():
         self.loss_fun = loss_fun
         self.shuffle_flag = shuffle_flag
 
+        # Clear training loss metadata from any previous training runs
+        self.epochs_w_loss_measure = []
+        self.training_losses = []
+        self.training_accuracies = []
+        self.validation_losses = []
+        self.validation_accuracies = []
+
     @staticmethod
-    def shuffle():
-        pass
+    def shuffle(input_dataset, target_dataset):
+        """
+        Returns shuffled versions of the inputs.
+
+        Arguments:
+            - input_dataset {np.ndarray} -- Array of input features, of shape
+                (#_data_points, n_features).
+            - target_dataset {np.ndarray} -- Array of corresponding targets, of
+                shape (#_data_points, ).
+
+        Returns: 2-tuple of np.ndarray: (shuffled inputs, shuffled_targets).
+        """
+        assert input_dataset.shape[0] == target_dataset.shape[0], "input and target dataset do not have same number of datapoints!"
+        shuffled_idxs = np.random.permutation(input_dataset.shape[0])
+        return input_dataset[shuffled_idxs], target_dataset[shuffled_idxs]
+
+        
+
+    def minibatch_data(self, input_dataset, target_dataset):
+        assert input_dataset.shape[0] == target_dataset.shape[0], "input and target dataset do not have same number of datapoints!"
+
+        cut_points = np.arange(self.batch_size, input_dataset.shape[0], self.batch_size)
+        return np.split(input_dataset, cut_points), np.split(target_dataset, cut_points)
 
     def train(self, input_dataset, target_dataset):
-        pass
+
+        # Clear training loss metadata from any previous training runs
+        self.epochs_w_loss_measure = []
+        self.training_losses = []
+        self.training_accuracies = []
+        self.validation_losses = []
+        self.validation_accuracies = []
+
+        # Shuffle input data
+        if self.shuffle_flag:
+            print("Shuffling dataset")
+            input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
+
+        # Split datasets into batches
+        batched_input, batched_target = self.minibatch_data(input_dataset, target_dataset)
+        print("Number of batches = ", len(batched_input))
+        print("Batch size = ", batched_input[0].shape)
+        
+        # Start outer training loop for epoch
+        for epoch in tqdm(range(1, self.nb_epoch + 1)):
+            pass
+
+
 
     def eval_loss(self, input_dataset, target_dataset):
         pass
@@ -113,7 +164,10 @@ def train():
     # Split data
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
-    # TODO: preprocess the data 
+    # TODO: preprocess the data
+    x_train_pre = x_train
+    x_val_pre = x_val
+    x_test_pre = x_test
     
     # Instatiate a network
     LinearLayer = collections.namedtuple("LinearLayer", "name in_dim out_dim")
@@ -135,6 +189,23 @@ def train():
     print(network)
 
     # Add the network to a trainer and train
+    # TODO: add to a tuple or something more secure (link it with the hyperparameter optimiser)
+    batch_size = 8
+    nb_epoch = 1000
+    learning_rate = 0.01
+    loss_fun = "mse"
+    shuffle_flag = True
+    
+    trainer = TorchTrainer(
+        network=network,
+        batch_size=batch_size,
+        nb_epoch=nb_epoch,
+        learning_rate=learning_rate,
+        loss_fun=loss_fun,
+        shuffle_flag=shuffle_flag,
+    )
+
+    trainer.train(x_train_pre, y_train)
 
 
     # Evaluate results 
