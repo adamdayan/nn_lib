@@ -2,8 +2,10 @@ import collections
 
 from tqdm import tqdm
 import numpy as np
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 
 from nn_lib import (
     MultiLayerNetwork,
@@ -36,10 +38,11 @@ class SequentialNet(nn.Module):
             elif layer.name == "dropout":
                 self._layers.append(nn.Dropout(p=layer.p))
 
-        self.net = nn.Sequential(*self._layers)
+        self.network = nn.Sequential(*self._layers)
 
     def forward(self, x):
-        return self.net(x)
+        x_tens = torch.from_numpy(x).float()
+        return self.network(x_tens)
 
 class TorchTrainer():
 
@@ -49,7 +52,8 @@ class TorchTrainer():
                  nb_epoch,
                  learning_rate,
                  loss_fun,
-                 shuffle_flag):
+                 shuffle_flag,
+                 optimizer="sgd"):
 
         self.network = network
         self.batch_size = batch_size
@@ -58,6 +62,9 @@ class TorchTrainer():
         self.loss_fun = loss_fun
         self.shuffle_flag = shuffle_flag
 
+        if optimizer == "sgd":
+            self.optimizer = optim.SGD(self.network.parameters(), lr=self.learning_rate)
+        
         # Clear training loss metadata from any previous training runs
         self.epochs_w_loss_measure = []
         self.training_losses = []
@@ -81,8 +88,6 @@ class TorchTrainer():
         assert input_dataset.shape[0] == target_dataset.shape[0], "input and target dataset do not have same number of datapoints!"
         shuffled_idxs = np.random.permutation(input_dataset.shape[0])
         return input_dataset[shuffled_idxs], target_dataset[shuffled_idxs]
-
-        
 
     def minibatch_data(self, input_dataset, target_dataset):
         assert input_dataset.shape[0] == target_dataset.shape[0], "input and target dataset do not have same number of datapoints!"
@@ -111,8 +116,31 @@ class TorchTrainer():
         
         # Start outer training loop for epoch
         for epoch in tqdm(range(1, self.nb_epoch + 1)):
-            pass
 
+            # Start inner training loop forwards and backwards pass for each batch
+            for idx, batch_input in enumerate(batched_input):
+
+                # Forward pass through the network
+                batch_output = self.network.forward(batch_input)
+
+                # Compute loss
+                criterion = nn.MSELoss()
+                batch_target = torch.from_numpy(batched_target[idx]).float()
+                batch_loss = criterion(batch_output, batch_target)
+
+                # Backprop
+                self.network.zero_grad()
+                batch_loss.backward()
+
+                # Update weights
+                # self.optimizer.zero_grad()
+                self.optimizer.step()
+                
+
+            if epoch % (self.nb_epoch / 100) == 0:
+                print("==== Loss stats for epoch " + str(epoch) + " ====")
+                print("Training loss = " + str(batch_loss))
+                print(batch_loss.grad_fn)
 
 
     def eval_loss(self, input_dataset, target_dataset):
@@ -182,7 +210,7 @@ def train():
               LinearLayer(name="linear", in_dim=8, out_dim=8),
               ReluLayer(name="relu"),
               DropoutLayer(name="dropout", p=0.5),
-              LinearLayer(name="linear", in_dim=3, out_dim=8)]
+              LinearLayer(name="linear", in_dim=8, out_dim=3)]
 
     network = SequentialNet(layers)
     print("Network instatiated:")
