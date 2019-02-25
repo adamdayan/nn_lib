@@ -14,9 +14,11 @@ print(ws.name, ws.location, ws.resource_group, ws.location, sep = '\t')
 script_folder = os.getcwd()
 
 # Configure run configuration 
-packages = ['numpy', 'scikit-learn', 'pytorch']
+packages = ['numpy', 'scikit-learn', 'pytorch', 'matplotlib', 'tqdm']
 
 run_remote = RunConfiguration()
+run_remote.environment.python.user_managed_dependencies = False
+run_remote.auto_prepare_environment = True
 run_remote.environment.python.conda_dependencies = \
     CondaDependencies.create(conda_packages=packages)
 
@@ -39,7 +41,7 @@ script_params = {}
 pt_est = PyTorch(source_directory=script_folder,
                  script_params=script_params,
                  compute_target=compute_target,
-                 entry_script='hello_world.py',
+                 entry_script='learn_FM.py',
                  use_gpu=True)
 
 # Submit PyTorch experiment

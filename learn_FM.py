@@ -1,31 +1,33 @@
 import collections
 
-from tqdm import tqdm
+# from tqdm import tqdm
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
-from nn_lib import (
-    MultiLayerNetwork,
-    Trainer,
-    Preprocessor,
-    save_network,
-    load_network,
-)
-from illustrate import illustrate_results_FM
+# from nn_lib import (
+#     MultiLayerNetwork,
+#     Trainer,
+#     Preprocessor,
+#     save_network,
+#     load_network,
+# )
+# from illustrate import illustrate_results_FM
 
 
 class SequentialNet(nn.Module):
 
-    def __init__(self, layers):
+    def __init__(self, layers, device):
 
         super(SequentialNet, self).__init__()
         
         self._layer_names = layers
         self._layers = []
+
+        self.device = device
 
         # Chain together the layers
         for layer in self._layer_names:
@@ -43,6 +45,7 @@ class SequentialNet(nn.Module):
 
     def forward(self, x):
         x_tens = torch.from_numpy(x).float()
+        x_tens = x_tens.to(self.device)
         return self.network(x_tens)
 
 class TorchTrainer():
@@ -54,14 +57,16 @@ class TorchTrainer():
                  learning_rate,
                  loss_fun,
                  shuffle_flag,
-                 optimizer="sgd"):
+                 optimizer,
+                 device):
 
-        self.network = network
+        self.network = network.to(device)
         self.batch_size = batch_size
         self.nb_epoch = nb_epoch
         self.learning_rate = learning_rate
         self.loss_fun = loss_fun
         self.shuffle_flag = shuffle_flag
+        self.device = device
 
         if self.loss_fun == "mse":
             self.loss_criterion = nn.MSELoss()
@@ -123,7 +128,9 @@ class TorchTrainer():
         print("Batch size = ", batched_input[0].shape)
         
         # Start outer training loop for epoch
-        for epoch in tqdm(range(1, self.nb_epoch + 1)):
+        # for epoch in tqdm(range(1, self.nb_epoch + 1)):
+        for epoch in range(1, self.nb_epoch + 1):
+            print("Running for epoch " + str(epoch))
 
             self.network.train()  # Sets the model back to training mode
 
@@ -135,6 +142,7 @@ class TorchTrainer():
 
                 # Compute loss
                 batch_target = torch.from_numpy(batched_target[idx]).float()
+                batch_target = batch_target.to(self.device)
                 batch_loss = self.loss_criterion(batch_output, batch_target)
 
                 # Backprop
@@ -155,9 +163,13 @@ class TorchTrainer():
                 # self.validation_accuracies = []
 
                 if epoch % (self.nb_epoch / 20) == 0:
-                    tqdm.write("==== Loss stats for epoch " + str(epoch) + " ====")
-                    tqdm.write("Training loss = " + str(training_loss))
-                    tqdm.write("Validation loss = " + str(validation_loss))
+                    print("==== Loss stats for epoch " + str(epoch) + " ====")
+                    print("Training loss = " + str(training_loss))
+                    print("Validation loss = " + str(validation_loss))
+                    
+                    # tqdm.write("==== Loss stats for epoch " + str(epoch) + " ====")
+                    # tqdm.write("Training loss = " + str(training_loss))
+                    # tqdm.write("Validation loss = " + str(validation_loss))
 
 
     def eval_loss(self, input_dataset, target_dataset):
@@ -176,6 +188,7 @@ class TorchTrainer():
 
             # Calculate loss
             target_tensor = torch.from_numpy(target_dataset).float()
+            target_tensor = target_tensor.to(self.device)
             loss = self.loss_criterion(output_tensor, target_tensor)
 
             return loss.item()
@@ -218,6 +231,13 @@ def split_train_val_test(dataset, last_feature_idx):
 
 def train():
 
+    # MANUAL: run on gpu
+    is_gpu_run = True
+
+    # Device configuration
+    device = torch.device('cuda' if is_gpu_run else 'cpu')
+    print("Running on device " + str(device))
+
     # Load and prepare data 
     dataset = np.loadtxt("FM_dataset.dat")
 
@@ -244,7 +264,7 @@ def train():
               DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=8, out_dim=3)]
 
-    network = SequentialNet(layers)
+    network = SequentialNet(layers, device)
     print("Network instatiated:")
     print(network)
 
@@ -255,6 +275,7 @@ def train():
     learning_rate = 0.01
     loss_fun = "mse"
     shuffle_flag = True
+    optimizer = "adam"
     
     trainer = TorchTrainer(
         network=network,
@@ -263,7 +284,8 @@ def train():
         learning_rate=learning_rate,
         loss_fun=loss_fun,
         shuffle_flag=shuffle_flag,
-        optimizer="adam"
+        optimizer=optimizer,
+        device=device
     )
 
     trainer.train(x_train_pre, y_train, x_val_pre, y_val)
@@ -272,45 +294,45 @@ def train():
     print("Final train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
     print("Final validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
 
-    # Plot learning curves
-    # to check how well model is training (e.g. is there overfitting)
-    plt.figure(figsize=(20,10))
-    plt.suptitle("Loss and accuracy vs epochs for " + loss_fun)
+    # # Plot learning curves
+    # # to check how well model is training (e.g. is there overfitting)
+    # plt.figure(figsize=(20,10))
+    # plt.suptitle("Loss and accuracy vs epochs for " + loss_fun)
 
-    # Description of the hyperparams
-    hyperparams_text = "Hyperparameters: \n " + \
-                       "- lr = " + str(learning_rate) + \
-                       "\n - batch_size = " + str(batch_size) + \
-                       "\n - loss function = " + loss_fun + \
-                       "\n - number of epochs = " + str(nb_epoch)
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    plt.figtext(0.75, 0.75, hyperparams_text, bbox=props)
+    # # Description of the hyperparams
+    # hyperparams_text = "Hyperparameters: \n " + \
+    #                    "- lr = " + str(learning_rate) + \
+    #                    "\n - batch_size = " + str(batch_size) + \
+    #                    "\n - loss function = " + loss_fun + \
+    #                    "\n - number of epochs = " + str(nb_epoch)
+    # props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    # plt.figtext(0.75, 0.75, hyperparams_text, bbox=props)
 
-    # Plot loss vs number of epochs
-    plt.plot(trainer.epochs_w_loss_measure, trainer.training_losses)
-    plt.plot(trainer.epochs_w_loss_measure, trainer.validation_losses)
-    plt.legend(['training', 'validation'], loc='upper left')
-    plt.xlabel("Number of epochs")
-    plt.ylabel("Loss (" + loss_fun + ")")
+    # # Plot loss vs number of epochs
+    # plt.plot(trainer.epochs_w_loss_measure, trainer.training_losses)
+    # plt.plot(trainer.epochs_w_loss_measure, trainer.validation_losses)
+    # plt.legend(['training', 'validation'], loc='upper left')
+    # plt.xlabel("Number of epochs")
+    # plt.ylabel("Loss (" + loss_fun + ")")
 
-    plt.savefig(loss_fun + "_loss_plot.png")
+    # plt.savefig(loss_fun + "_loss_plot.png")
     
     # out = network.forward(dataset
     
 
     
 
-def main():
-    dataset = np.loadtxt("FM_dataset.dat")
-    #######################################################################
-    #                       ** START OF YOUR CODE **
-    #######################################################################
+# def main():
+#     dataset = np.loadtxt("FM_dataset.dat")
+#     #######################################################################
+#     #                       ** START OF YOUR CODE **
+#     #######################################################################
 
     
-    #######################################################################
-    #                       ** END OF YOUR CODE **
-    #######################################################################
-    illustrate_results_FM(network, prep)
+#     #######################################################################
+#     #                       ** END OF YOUR CODE **
+#     #######################################################################
+#     illustrate_results_FM(network, prep)
 
 
 if __name__ == "__main__":

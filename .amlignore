@@ -6,3 +6,6 @@ outputs
 azureml-setup
 docs
 venv_azure/
+
+simulator.py
+nn_lib.py
