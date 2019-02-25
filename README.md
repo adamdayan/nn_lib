@@ -1,5 +1,19 @@
 # README
 
+## How to view PyTorch model outputs in Tensorboard
+
+As the PyTorch models train they log their output to a log file which
+can then be viewed in Tensorboard.
+
+Run the following to open the logs in tensorboard
+
+```
+python3 -m tensorboard.main --logdir=<log_folder/> --port=6006
+
+```
+
+Then view port 6006 in your browser.
+
 ## How to train the PyTorch models on Azure
 
 ### Step 1 - create a virtualenv env on the lab machines so that you
