@@ -2,6 +2,8 @@ import collections
 import time
 import datetime
 import os
+import sys
+import getopt
 
 from logger import Logger
 import numpy as np
@@ -36,6 +38,8 @@ class SequentialNet(nn.Module):
                 self._layers.append(nn.Sigmoid())
             elif layer.name == "dropout":
                 self._layers.append(nn.Dropout(p=layer.p))
+            elif layer.name == "softmax":
+                self._layers.append(nn.Softmax())
 
         self.network = nn.Sequential(*self._layers)
 
@@ -44,9 +48,11 @@ class SequentialNet(nn.Module):
         x_tens = x_tens.to(self.device)
         return self.network(x_tens)
 
+
 class TorchTrainer():
 
     def __init__(self,
+                 problem_type,
                  network,
                  batch_size,
                  nb_epoch,
@@ -57,6 +63,7 @@ class TorchTrainer():
                  device,
                  log_output_path=''):
 
+        self.problem_type = problem_type
         self.network = network.to(device)
         self.batch_size = batch_size
         self.nb_epoch = nb_epoch
@@ -138,7 +145,12 @@ class TorchTrainer():
                 batch_output = self.network.forward(batch_input)
 
                 # Compute loss
-                batch_target = torch.from_numpy(batched_target[idx]).float()
+                if self.problem_type == "regression":
+                    batch_target = torch.from_numpy(batched_target[idx]).float()
+                elif self.problem_type == "classification":
+                    # https://discuss.pytorch.org/t/loss-functions-for-batches/20488
+                    batch_target = torch.from_numpy(batched_target[idx]).type(torch.long)
+                    batch_target = batch_target.argmax(1)
                 batch_target = batch_target.to(self.device)
                 batch_loss = self.loss_criterion(batch_output, batch_target)
 
@@ -156,10 +168,25 @@ class TorchTrainer():
                 self.epochs_w_loss_measure.append(epoch)
                 self.training_losses.append(training_loss)
                 self.validation_losses.append(validation_loss)
-                # self.training_accuracies = []
-                # self.validation_accuracies = []
 
+                if self.problem_type == "classification":  # Then also compute accuracies
+                    train_preds = self.network.forward(input_dataset)
+                    train_preds = train_preds.detach().numpy().argmax(axis=1).squeeze()
+                    train_targets = target_dataset.argmax(axis=1).squeeze()
+                    training_accuracy = (train_preds == train_targets).mean()
+                    self.training_accuracies.append(training_accuracy)
+
+                    val_preds = self.network.forward(input_dataset_val)
+                    val_preds = val_preds.detach().numpy().argmax(axis=1).squeeze()
+                    val_targets = target_dataset_val.argmax(axis=1).squeeze()
+                    validation_accuracy = (val_preds == val_targets).mean()
+                    self.validation_accuracies.append(validation_accuracy)
+                    
                 info = {'training_loss': training_loss, 'validation_loss': validation_loss}
+
+                if self.problem_type == "classification":
+                    info['training_accuracy'] = training_accuracy
+                    info['validation_accuracy'] = validation_accuracy
                 
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, epoch)
@@ -173,7 +200,11 @@ class TorchTrainer():
                     print("==== Loss stats for epoch " + str(epoch) + " ====")
                     print("Training loss = " + str(training_loss))
                     print("Validation loss = " + str(validation_loss))
-                        
+
+                    if self.problem_type == "classification":
+                        print("Training accuracy = {0:.2%}".format(training_accuracy))
+                        print("Validation accuracy = {0:.2%}".format(validation_accuracy))
+
 
     def eval_loss(self, input_dataset, target_dataset):
         """
@@ -190,7 +221,13 @@ class TorchTrainer():
             output_tensor = self.network.forward(input_dataset)
 
             # Calculate loss
-            target_tensor = torch.from_numpy(target_dataset).float()
+            if self.problem_type == "regression":
+                target_tensor = torch.from_numpy(target_dataset).float()
+            elif self.problem_type == "classification":
+                # https://discuss.pytorch.org/t/loss-functions-for-batches/20488
+                target_tensor = torch.from_numpy(target_dataset).type(torch.long)
+                target_tensor = target_tensor.argmax(1)
+
             target_tensor = target_tensor.to(self.device)
             loss = self.loss_criterion(output_tensor, target_tensor)
 
@@ -232,26 +269,64 @@ def split_train_val_test(dataset, last_feature_idx):
 
     return x_train, y_train, x_val, y_val, x_test, y_test
 
-def train_fm():
 
+def create_output_folder(run_type):
+    """
+    Creates an output folder for this run
+    """
     # Create a timestamp for saving results
     timestamp = time.time()
     timestamp = datetime.datetime.fromtimestamp(timestamp)
     readable_time = str(timestamp.year) + str(timestamp.month).zfill(2) + str(timestamp.day).zfill(2) + "_" + str(timestamp.hour).zfill(2) + str(timestamp.minute).zfill(2) + str(timestamp.second).zfill(2)
 
     # Create an output folder for this run 
-    output_path = "output/" + readable_time
+    output_path = "output/" + run_type + "/" + readable_time
     if not os.path.exists(output_path):
         os.makedirs(output_path)
         print("Creating new folder: " + output_path)
-    
-    # MANUAL: run on gpu
-    is_gpu_run = False
+
+    return output_path, readable_time
+
+
+def save_training_output(network, layers, hyper_params, output_path, readable_time):
+    """
+    Saves training output to file
+    """
+
+    # Save pytorch model
+    save_torch_model(network, layers, output_path + "/" + readable_time + "_model")
+
+    # Save hyperparameters to log file
+    parameter_out_file = output_path + "/parameters.txt"
+    with open(parameter_out_file, 'w') as f:
+        f.write("------ LOG FILE ------\n")
+        f.write("Model ran at " + str(readable_time) + "\n\n")
+
+        f.write("Hyperparameters:\n")
+
+        for key, value in hyper_params.items():
+            f.write(key + " = " + str(value) + "\n")
+        f.write("\n\nLayers:\n")
+        for layer in layers:
+            if layer.name == "linear":
+                f.write(layer.name + "(" + str(layer.in_dim) + ", " + str(layer.out_dim) + ")\n")
+            if layer.name == "relu":
+                f.write(layer.name + "\n")
+            if layer.name == "dropout":
+                f.write(layer.name + "(p=" + str(layer.p) + ")\n")
+
+    f.close()
+
+
+def train_fm(is_gpu_run=False):
 
     # Device configuration
     device = torch.device('cuda' if is_gpu_run else 'cpu')
     print("Running on device " + str(device))
 
+    # Create an output folder for results of this run
+    output_path, readable_time = create_output_folder("learn_fm")
+    
     # Load and prepare data 
     dataset = np.loadtxt("FM_dataset.dat")
 
@@ -278,7 +353,6 @@ def train_fm():
     print(network)
 
     # Add the network to a trainer and train
-    # TODO: add to a tuple or something more secure (link it with the hyperparameter optimiser)
     hyper_params = {'batch_size': 32,
                     'nb_epoch': 100,
                     'learning_rate': 0.005,
@@ -287,6 +361,7 @@ def train_fm():
                     'optimizer': "adam"}
     
     trainer = TorchTrainer(
+        problem_type="regression",
         network=network,
         batch_size=hyper_params['batch_size'],
         nb_epoch=hyper_params['nb_epoch'],
@@ -305,27 +380,100 @@ def train_fm():
     print("Final validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
 
     # Save model + hyperparamers to file
-    save_torch_model(network, layers, output_path + "/" + readable_time + "_model")
+    save_training_output(network, layers, hyper_params, output_path, readable_time)
 
-    parameter_out_file = output_path + "/parameters.txt"
-    with open(parameter_out_file, 'w') as f:
-        f.write("------ LOG FILE ------\n")
-        f.write("Model ran at " + str(readable_time) + "\n\n")
+# TODO: could abstract this further to reduce code repetition
+def train_roi(is_gpu_run=False):
 
-        f.write("Hyperparameters:\n")
+    # Device configuration
+    device = torch.device('cuda' if is_gpu_run else 'cpu')
+    print("Running on device " + str(device))
 
-        for key, value in hyper_params.items():
-            f.write(key + " = " + str(value) + "\n")
-        f.write("\n\nLayers:\n")
-        for layer in layers:
-            if layer.name == "linear":
-                f.write(layer.name + "(" + str(layer.in_dim) + ", " + str(layer.out_dim) + ")\n")
-            if layer.name == "relu":
-                f.write(layer.name + "\n")
-            if layer.name == "dropout":
-                f.write(layer.name + "(p=" + str(layer.p) + ")\n")
+    # Create an output folder for results of this run
+    output_path, readable_time = create_output_folder("learn_roi")
+    
+    # Load and prepare data 
+    dataset = np.loadtxt("ROI_dataset.dat")
 
-    f.close()
+    # Split data
+    x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
+
+    # TODO: preprocess the data
+    x_train_pre = x_train
+    x_val_pre = x_val
+    x_test_pre = x_test
+    
+    # Instatiate a network    
+    layers = [LinearLayer(name="linear", in_dim=3, out_dim=8),
+              LinearLayer(name="linear", in_dim=8, out_dim=8),
+              ReluLayer(name="relu"),
+              DropoutLayer(name="dropout", p=0.5),
+              # LinearLayer(name="linear", in_dim=8, out_dim=8),
+              # ReluLayer(name="relu"),
+              # DropoutLayer(name="dropout", p=0.5),
+              LinearLayer(name="linear", in_dim=8, out_dim=4),
+              SoftmaxLayer(name="softmax")]
+
+    network = SequentialNet(layers, device)
+    print("Network instatiated:")
+    print(network)
+
+    # Add the network to a trainer and train
+    hyper_params = {'batch_size': 32,
+                    'nb_epoch': 1000,
+                    'learning_rate': 0.005,
+                    'loss_fun': "cross_entropy",
+                    'shuffle_flag': True,
+                    'optimizer': "adam"}
+    
+    trainer = TorchTrainer(
+        problem_type="classification",
+        network=network,
+        batch_size=hyper_params['batch_size'],
+        nb_epoch=hyper_params['nb_epoch'],
+        learning_rate=hyper_params['learning_rate'],
+        loss_fun=hyper_params['loss_fun'],
+        shuffle_flag=hyper_params['shuffle_flag'],
+        optimizer=hyper_params['optimizer'],
+        device=device,
+        log_output_path=output_path
+    )
+
+    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
+
+    # Evaluate results
+    print("Final train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
+    print("Final validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+
+    # Save model + hyperparamers to file
+    save_training_output(network, layers, hyper_params, output_path, readable_time)
+
 
 if __name__ == "__main__":
-    train_fm()
+
+    # Get command line arguments
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hvm:", ["model="])
+    except getopt.GetoptError:
+        print("pytorch_net.py -m <model_name> optional: [-v (verbose output)]")
+        sys.exit(2)
+
+    model = None
+    for opt, arg in opts:
+        if opt == '-h':
+            print("pytorch_net.py -m <model_name> optional: [-v (verbose output)]")
+            print("-m <model_name>: either learn_fm or learn_roi")
+        elif opt in ("-m", "--model"):
+            model = arg
+
+    if not model:
+        print("error: must provide model -m")
+        sys.exit(-1)
+
+    # Run code
+    if model == "learn_fm":
+        train_fm(is_gpu_run=False)
+    elif model == "learn_roi":
+        train_roi(is_gpu_run=False)
+    else:
+        raise ValueError("Not a valid model " + str(model))

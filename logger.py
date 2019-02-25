@@ -1,4 +1,8 @@
 # Code referenced from https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514
+'''
+CREDIT TO @YUNJEY FOR THIS CODE - https://github.com/yunjey/pytorch-tutorial
+'''
+
 import tensorflow as tf
 import numpy as np
 import scipy.misc 
