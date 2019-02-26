@@ -7,6 +7,7 @@ import getopt
 
 from logger import Logger
 import numpy as np
+from skopt import gp_minimize
 
 import torch
 import torch.nn as nn
@@ -15,6 +16,7 @@ import torch.optim as optim
 
 from pytorch_pp import TorchPreprocessor
 from torch_utils import *
+    
 
 
 class SequentialNet(nn.Module):
@@ -111,10 +113,12 @@ class TorchTrainer():
         shuffled_idxs = np.random.permutation(input_dataset.shape[0])
         return input_dataset[shuffled_idxs], target_dataset[shuffled_idxs]
 
-    def minibatch_data(self, input_dataset, target_dataset):
+    def minibatch_data(self, input_dataset, target_dataset, batch_size=None):
+        if batch_size == None:
+            batch_size = self.batch_size
         assert input_dataset.shape[0] == target_dataset.shape[0], "input and target dataset do not have same number of datapoints!"
 
-        cut_points = np.arange(self.batch_size, input_dataset.shape[0], self.batch_size)
+        cut_points = np.arange(batch_size, input_dataset.shape[0], batch_size)
         return np.split(input_dataset, cut_points), np.split(target_dataset, cut_points)
 
     def train(self, input_dataset, target_dataset, input_dataset_val, target_dataset_val):
@@ -209,6 +213,78 @@ class TorchTrainer():
                         print("Validation accuracy = {0:.2%}".format(validation_accuracy))
 
 
+    def set_optimisation(self, x_train, y_train, x_val, y_val):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.x_val = x_val
+        self.y_val = y_val
+                        
+    def optimise_hyperparameters(self, params):
+        #extract params from input array
+        batch_size = params[0]
+        learning_rate = params[1]
+
+        input_dataset = self.x_train
+        target_dataset = self.y_train
+        input_dataset_val = self.x_val
+        target_dataset_val = self.y_val
+        hidden_layer_neurons = params[2]
+
+        #build network
+        layers = [LinearLayer(name="linear", in_dim=3, out_dim=hidden_layer_neurons),
+              # LinearLayer(name="linear", in_dim=8, out_dim=8),
+              ReluLayer(name="relu"),
+              # DropoutLayer(name="dropout", p=0.2),
+              LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=hidden_layer_neurons),
+              ReluLayer(name="relu"),
+              # DropoutLayer(name="dropout", p=0.5),
+              LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=3)]
+
+        network = SequentialNet(layers, self.device)
+        optim.Adam(network.parameters(), lr=learning_rate)
+
+        #split data
+        input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
+        batched_input, batched_target = self.minibatch_data(input_dataset, target_dataset, batch_size)
+
+        #train model 
+        for epoch in range(1, self.nb_epoch + 1):
+            network.train()
+
+            for batch_input, batch_target in zip(batched_input, batched_target):
+                batch_output = network.forward(batch_input)
+
+                if self.problem_type == "regression":
+                    cur_batch_target = torch.from_numpy(batch_target).float()
+                elif self.problem_type == "classification":
+                    cur_batch_target = torch.from_numpy(batch_target).type(torch.long)
+                    cur_batch_target = cur_batch_target.argmax(1)
+
+                batch_loss = self.loss_criterion(batch_output, cur_batch_target)
+
+                network.zero_grad()
+                batch_loss.backward()
+
+        #evaluate model on val data
+        with torch.no_grad():
+            output_tensor = network.forward(input_dataset_val)
+
+            if self.problem_type == "regression":
+                target_tensor = torch.from_numpy(target_dataset_val).float()
+            elif self.problem_type == "classification":
+                target_tensor = torch.from_numpy(target_dataset_val).type(torch.long)
+                target_tensor = cur_batch_target.argmax(1)
+
+            validation_loss = self.loss_criterion(output_tensor, target_tensor)
+            print(validation_loss)
+            print(self.loss_criterion)
+            print(output_tensor)
+            print(target_tensor)
+            
+            return validation_loss.item()
+                
+        
+
     def eval_loss(self, input_dataset, target_dataset):
         """
         Calculates loss from the network
@@ -233,7 +309,7 @@ class TorchTrainer():
 
             target_tensor = target_tensor.to(self.device)
             loss = self.loss_criterion(output_tensor, target_tensor)
-
+            
             return loss.item()
 
 
@@ -319,8 +395,8 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
                 f.write(layer.name + "(p=" + str(layer.p) + ")\n")
 
     f.close()
-
-
+        
+    
 def train_fm(is_gpu_run=False):
 
     # Device configuration
@@ -455,6 +531,58 @@ def train_roi(is_gpu_run=False):
     save_training_output(network, layers, hyper_params, output_path, readable_time)
 
 
+def optimise_fm():
+    # Load and prepare data 
+    dataset = np.loadtxt("FM_dataset.dat")
+
+    # Split data
+    x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
+
+    # TODO: preprocess the data
+    x_train_pre = x_train
+    x_val_pre = x_val
+    x_test_pre = x_test
+
+    # Create an output folder for results of this run
+    output_path, readable_time = create_output_folder("optimise_fm")
+
+    network = SequentialNet([LinearLayer(name="linear", in_dim=3, out_dim=32)])
+    trainer = TorchTrainer(
+        problem_type="regression",
+        network=network,
+        batch_size=10,
+        nb_epoch=50,
+        learning_rate=0.01,
+        loss_fun="mse",
+        shuffle_flag=True,
+        optimizer="adam",
+        device="cpu",
+        log_output_path=output_path
+    )
+
+    trainer.set_optimisation(x_train_pre, y_train, x_val_pre, x_val)
+    
+    optimisation_parameters = [
+        (10,200),
+        (0.01, 0.2),
+        (10,100)        
+    ]
+
+    result = gp_minimize(trainer.optimise_hyperparameters,
+                         optimisation_parameters,
+                         acq_func="EI",
+                         n_calls=15,
+                         n_random_starts=5,
+                         noise=0.1**2,
+                         random_state=123
+                         )
+
+    print(result)
+                         
+        
+
+    
+
 if __name__ == "__main__":
 
     # Get command line arguments
@@ -481,5 +609,7 @@ if __name__ == "__main__":
         train_fm(is_gpu_run=False)
     elif model == "learn_roi":
         train_roi(is_gpu_run=False)
+    elif model == "optimise_fm":
+        optimise_fm()
     else:
         raise ValueError("Not a valid model " + str(model))
