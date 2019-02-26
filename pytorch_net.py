@@ -14,14 +14,14 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from torch_utils import *
-    
+
 
 class SequentialNet(nn.Module):
 
     def __init__(self, layers, device="cpu"):
 
         super(SequentialNet, self).__init__()
-        
+
         self._layer_names = layers
         self._layers = []
 
@@ -78,7 +78,7 @@ class TorchTrainer():
             self.loss_criterion = nn.MSELoss()
         elif self.loss_fun == "cross_entropy":
             self.loss_criterion = nn.CrossEntropyLoss()
-        
+
         if optimizer == "sgd":
             self.optimizer = optim.SGD(self.network.parameters(), lr=self.learning_rate)
         elif optimizer == "adam":
@@ -132,7 +132,7 @@ class TorchTrainer():
         batched_input, batched_target = self.minibatch_data(input_dataset, target_dataset)
         print("Number of batches = ", len(batched_input))
         print("Batch size = ", batched_input[0].shape)
-        
+
         # Start outer training loop for epoch
         for epoch in range(1, self.nb_epoch + 1):
 
@@ -160,7 +160,7 @@ class TorchTrainer():
 
                 # Update weights
                 self.optimizer.step()
-                
+
             if epoch % (self.nb_epoch / 100) == 0:
                 training_loss = self.eval_loss(input_dataset, target_dataset)
                 validation_loss = self.eval_loss(input_dataset_val, target_dataset_val)
@@ -181,13 +181,13 @@ class TorchTrainer():
                     val_targets = target_dataset_val.argmax(axis=1).squeeze()
                     validation_accuracy = (val_preds == val_targets).mean()
                     self.validation_accuracies.append(validation_accuracy)
-                    
+
                 info = {'training_loss': training_loss, 'validation_loss': validation_loss}
 
                 if self.problem_type == "classification":
                     info['training_accuracy'] = training_accuracy
                     info['validation_accuracy'] = validation_accuracy
-                
+
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, epoch)
 
@@ -208,14 +208,14 @@ class TorchTrainer():
 
     def eval_loss(self, input_dataset, target_dataset):
         """
-        Calculates loss from the network 
+        Calculates loss from the network
         NB: turns off dropout and gradient caching as not required when performing an eval
         """
 
         with torch.no_grad():  # Stops autograd engine
 
             # Deactivates dropout layers
-            self.network.eval() 
+            self.network.eval()
 
             # Forward pass
             output_tensor = self.network.forward(input_dataset)
@@ -232,14 +232,14 @@ class TorchTrainer():
             loss = self.loss_criterion(output_tensor, target_tensor)
 
             return loss.item()
-    
+
 
 def split_train_val_test(dataset, last_feature_idx):
 
     np.random.shuffle(dataset)
     x = dataset[:, :(last_feature_idx + 1)]
     y = dataset[:, (last_feature_idx + 1):]
-    
+
     # TODO: CHECK THE SPLIT THOROUGLY
     # Split the dataset into train, val, test
     train_idx = int(0.8 * len(x))
@@ -247,7 +247,7 @@ def split_train_val_test(dataset, last_feature_idx):
     x_train = x[:train_idx]
     y_train = y[:train_idx]
 
-    # Remainder should be split 
+    # Remainder should be split
     x_rem = x[train_idx:]
     y_rem = y[train_idx:]
 
@@ -279,7 +279,7 @@ def create_output_folder(run_type):
     timestamp = datetime.datetime.fromtimestamp(timestamp)
     readable_time = str(timestamp.year) + str(timestamp.month).zfill(2) + str(timestamp.day).zfill(2) + "_" + str(timestamp.hour).zfill(2) + str(timestamp.minute).zfill(2) + str(timestamp.second).zfill(2)
 
-    # Create an output folder for this run 
+    # Create an output folder for this run
     output_path = "output/" + run_type + "/" + readable_time
     if not os.path.exists(output_path):
         os.makedirs(output_path)
@@ -288,7 +288,7 @@ def create_output_folder(run_type):
     return output_path, readable_time
 
 
-def save_training_output(network, layers, hyper_params, output_path, readable_time):
+def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss):
     """
     Saves training output to file
     """
@@ -299,13 +299,14 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
     # Save hyperparameters to log file
     parameter_out_file = output_path + "/parameters.txt"
     with open(parameter_out_file, 'w') as f:
-        f.write("------ LOG FILE ------\n")
-        f.write("Model ran at " + str(readable_time) + "\n\n")
+        #f.write("------ LOG FILE ------\n")
+        #f.write("Model ran at " + str(readable_time) + "\n\n")
 
         f.write("Hyperparameters:\n")
 
         for key, value in hyper_params.items():
             f.write(key + " = " + str(value) + "\n")
+            """"
         f.write("\n\nLayers:\n")
         for layer in layers:
             if layer.name == "linear":
@@ -313,7 +314,10 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
             if layer.name == "relu":
                 f.write(layer.name + "\n")
             if layer.name == "dropout":
-                f.write(layer.name + "(p=" + str(layer.p) + ")\n")
+                f.write(layer.name + "(p=" + str(layer.p) +)
+                """
+        f.write("Training Loss: " + str(train_loss)+"\n")
+        f.write("Validation Loss: " + str(val_loss))
 
     f.close()
 
@@ -326,8 +330,8 @@ def train_fm(is_gpu_run=False):
 
     # Create an output folder for results of this run
     output_path, readable_time = create_output_folder("learn_fm")
-    
-    # Load and prepare data 
+
+    # Load and prepare data
     dataset = np.loadtxt("FM_dataset.dat")
 
     # Split data
@@ -337,8 +341,8 @@ def train_fm(is_gpu_run=False):
     x_train_pre = x_train
     x_val_pre = x_val
     x_test_pre = x_test
-    
-    # Instatiate a network    
+
+    # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
               ReluLayer(name="relu"),
@@ -359,7 +363,7 @@ def train_fm(is_gpu_run=False):
                     'loss_fun': "mse",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
-    
+
     trainer = TorchTrainer(
         problem_type="regression",
         network=network,
@@ -376,11 +380,16 @@ def train_fm(is_gpu_run=False):
     trainer.train(x_train_pre, y_train, x_val_pre, y_val)
 
     # Evaluate results
-    print("Final train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
-    print("Final validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+    train_loss=trainer.eval_loss(x_train_pre, y_train)
+    val_loss=trainer.eval_loss(x_val_pre, y_val)
+
+
+    print("Final train loss = {0:.2f}".format(train_loss))
+    print("Final validation loss = {0:.2f}".format(val_loss))
+
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time)
+    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
 
 # TODO: could abstract this further to reduce code repetition
 def train_roi(is_gpu_run=False):
@@ -391,8 +400,8 @@ def train_roi(is_gpu_run=False):
 
     # Create an output folder for results of this run
     output_path, readable_time = create_output_folder("learn_roi")
-    
-    # Load and prepare data 
+
+    # Load and prepare data
     dataset = np.loadtxt("ROI_dataset.dat")
 
     # Split data
@@ -402,8 +411,8 @@ def train_roi(is_gpu_run=False):
     x_train_pre = x_train
     x_val_pre = x_val
     x_test_pre = x_test
-    
-    # Instatiate a network    
+
+    # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
               ReluLayer(name="relu"),
@@ -425,7 +434,7 @@ def train_roi(is_gpu_run=False):
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
-    
+
     trainer = TorchTrainer(
         problem_type="classification",
         network=network,

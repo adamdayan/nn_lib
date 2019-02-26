@@ -1,5 +1,5 @@
 import collections
-
+from sklearn.metrics import confusion_matrix
 import numpy as np
 import torch
 import torch.nn as nn
@@ -17,18 +17,54 @@ from nn_lib import (
     load_network,
 )
 from illustrate import illustrate_results_FM
- 
+from evaluation_utils import *
+
+
+
+def evaluate_architecture(model_path,dataset,problem_type):
+    #w = torch.load(model_path)
+    checkpoint = torch.load(model_path+"20190226_203050_model_model.pt")
+
+    model = load_torch_model(model_path + "20190226_203050_model_model.pt", model_path + "20190226_203050_model_layers.pickle")
+    f=open(model_path+"parameters.txt")
+    model_hyperparams = f.read()
+    print(model_hyperparams)
+    if problem_type== "classification":
+        train_preds= model.forward(dataset[:, :3])
+        train_preds = train_preds.detach().numpy().argmax(axis=1).squeeze()
+        train_targets = (dataset[:, 3:6]).argmax(axis=1).squeeze()
+        print("Classification Confusion Matrix")
+        conf_matrix=confusion_matrix(train_targets, train_preds)
+        print(conf_matrix)
+        print("\n")
+        recall=recall_calculator(conf_matrix)
+        print("Recall: ", recall)
+
+        precision=precision_calculator(conf_matrix)
+        print("Precision: ", precision)
+
+        f1=f1_score_calculator(precision,recall)
+        print("F1 Score: ", f1)
+
+
+
+
+
+    #loss=(checkpoint['Loss'])
+
+
+
 def main():
-    dataset = np.loadtxt("FM_dataset.dat")
+
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
+    dataset = np.loadtxt("FM_dataset.dat")
+    model_path = "output/learn_fm/20190226_203050/"
+    problem_type="classification"
+    evaluate_architecture(model_path,dataset,problem_type)
 
-    model_path = "output/learn_fm/20190226_111420/"
-    model = load_torch_model(model_path + "20190226_111420_model_model.pt", model_path + "20190226_111420_model_layers.pickle")
 
-    print(model.forward(dataset[:, :3]))
-    
     #######################################################################
     #                       ** END OF YOUR CODE **
     #######################################################################
@@ -37,6 +73,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 
 
     # # Plot learning curves
@@ -61,5 +100,5 @@ if __name__ == "__main__":
     # plt.ylabel("Loss (" + loss_fun + ")")
 
     # plt.savefig(loss_fun + "_loss_plot.png")
-    
+
     # out = network.forward(dataset

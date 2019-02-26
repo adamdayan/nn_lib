@@ -12,6 +12,7 @@ SigmoidLayer = collections.namedtuple("SigmoidLayer", "name")
 DropoutLayer = collections.namedtuple("DropoutLayer", "name p")
 
 
+
 def save_torch_model(model, layers, filename):
     """
     Saves any pytorch model to file. Use .pt extension
@@ -33,8 +34,13 @@ def load_torch_model(model_filename, model_layers_filename):
 
     # Load pytorch model
     model = SequentialNet(layers=model_layers)
+
     model.load_state_dict(torch.load(model_filename))
     print(model)
+    #print(model.state_dict.'bias')
+
+
+    #print(model)
 
     # Switch eval mode on for inference
     model.eval()
