@@ -7,14 +7,14 @@ import getopt
 
 from logger import Logger
 import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import matplotlib.pyplot as plt
 
 from torch_utils import *
-
+    
 
 class SequentialNet(nn.Module):
 
@@ -342,9 +342,9 @@ def train_fm(is_gpu_run=False):
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
               ReluLayer(name="relu"),
-              DropoutLayer(name="dropout", p=0.2),
-              # LinearLayer(name="linear", in_dim=8, out_dim=8),
-              # ReluLayer(name="relu"),
+              # DropoutLayer(name="dropout", p=0.2),
+              LinearLayer(name="linear", in_dim=32, out_dim=32),
+              ReluLayer(name="relu"),
               # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=32, out_dim=3)]
 
@@ -354,7 +354,7 @@ def train_fm(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 100,
+                    'nb_epoch': 1000,
                     'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,

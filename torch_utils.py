@@ -39,4 +39,3 @@ def load_torch_model(model_filename, model_layers_filename):
     # Switch eval mode on for inference
     model.eval()
     return model
-    
