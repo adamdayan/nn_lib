@@ -80,10 +80,44 @@ class DataStats(object):
         fig.savefig(self.plots_folder + self.dataset_name + "_class_count.png")
 
 
-class TorchPreProcessor(object):
+class TorchPreprocessor(object):
 
-    def __init__(self):
-        pass
+    def __init__(self, data, lower_bound, upper_bound):
+
+        self.min_x = np.min(data, axis=0)
+        self.max_x = np.max(data, axis=0)
+        self.lower = lower_bound
+        self.upper = upper_bound
+
+    def normalise(self, x):
+        return self.lower + (((x - self.min_x) * (self.upper - self.lower)) / (self.max_x - self.min_x))
+
+    def denormalise(self, x):
+        return self.min_x + (((x - self.lower) * (self.max_x - self.min_x)) / (self.upper - self.lower))
+
+    def apply(self, data):
+        """
+        Apply thmber of training epoche pre-processing operations to the provided dataset.
+
+        Arguments:
+            - data {np.ndarray} dataset to be normalized.
+
+        Returns:
+            {np.ndarray} normalized dataset.
+        """
+        return self.normalise(data)
+
+    def revert(self, data):
+        """
+        Revert the pre-processing operations to retreive the original dataset.
+
+        Arguments:
+            - data {np.ndarray} dataset for which to revert normalization.
+
+        Returns:
+            {np.ndarray} reverted dataset.
+        """
+        return self.denormalise(data)
 
 
 if __name__ == "__main__":    
@@ -95,3 +129,12 @@ if __name__ == "__main__":
     print("Plotting stats for ROI_dataset.dat")
     data_roi = np.loadtxt("ROI_dataset.dat")
     torch_pp_fm = DataStats(data_roi, split_idx=2, dataset_name="ROI", problem_type="regression")
+
+    # torch_pp = TorchPreprocessor(data_roi, -1, 1)
+    # norm_data = torch_pp.apply(data_roi)
+    # rev_data = torch_pp.revert(norm_data)
+    # print(np.array_equal(data_roi, rev_data))
+    # print(np.sum(data_roi))
+    # print("break")
+    # print(np.sum(rev_data))
+

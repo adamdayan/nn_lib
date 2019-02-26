@@ -665,6 +665,8 @@ def lin_layer_test():
     grad_loss_wrt_inputs = layer.backward(grad_loss_wrt_outputs)
     layer.update_params(0.1)
     
+
 if __name__ == "__main__":
     example_main()
     #lin_layer_test()
+
