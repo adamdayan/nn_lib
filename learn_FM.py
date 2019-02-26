@@ -24,7 +24,10 @@ def main():
     #                       ** START OF YOUR CODE **
     #######################################################################
 
-    model = load_torch_model("test_save_model.pt", "test_save_layers.pickle")
+    model_path = "output/learn_fm/20190226_111420/"
+    model = load_torch_model(model_path + "20190226_111420_model_model.pt", model_path + "20190226_111420_model_layers.pickle")
+
+    print(model.forward(dataset[:, :3]))
     
     #######################################################################
     #                       ** END OF YOUR CODE **

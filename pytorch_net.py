@@ -339,14 +339,14 @@ def train_fm(is_gpu_run=False):
     x_test_pre = x_test
     
     # Instatiate a network    
-    layers = [LinearLayer(name="linear", in_dim=3, out_dim=8),
-              LinearLayer(name="linear", in_dim=8, out_dim=8),
+    layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
+              # LinearLayer(name="linear", in_dim=8, out_dim=8),
               ReluLayer(name="relu"),
-              DropoutLayer(name="dropout", p=0.5),
+              DropoutLayer(name="dropout", p=0.2),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
               # ReluLayer(name="relu"),
               # DropoutLayer(name="dropout", p=0.5),
-              LinearLayer(name="linear", in_dim=8, out_dim=3)]
+              LinearLayer(name="linear", in_dim=32, out_dim=3)]
 
     network = SequentialNet(layers, device)
     print("Network instatiated:")
@@ -404,14 +404,14 @@ def train_roi(is_gpu_run=False):
     x_test_pre = x_test
     
     # Instatiate a network    
-    layers = [LinearLayer(name="linear", in_dim=3, out_dim=8),
-              LinearLayer(name="linear", in_dim=8, out_dim=8),
+    layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
+              # LinearLayer(name="linear", in_dim=8, out_dim=8),
               ReluLayer(name="relu"),
-              DropoutLayer(name="dropout", p=0.5),
+              # DropoutLayer(name="dropout", p=0.5),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
               # ReluLayer(name="relu"),
               # DropoutLayer(name="dropout", p=0.5),
-              LinearLayer(name="linear", in_dim=8, out_dim=4),
+              LinearLayer(name="linear", in_dim=64, out_dim=4),
               SoftmaxLayer(name="softmax")]
 
     network = SequentialNet(layers, device)
