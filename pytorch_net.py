@@ -291,7 +291,7 @@ def create_output_folder(run_type):
     return output_path, readable_time
 
 
-def save_training_output(network, layers, hyper_params, output_path, readable_time):
+def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss):
     """
     Saves training output to file
     """
@@ -302,13 +302,14 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
     # Save hyperparameters to log file
     parameter_out_file = output_path + "/parameters.txt"
     with open(parameter_out_file, 'w') as f:
-        f.write("------ LOG FILE ------\n")
-        f.write("Model ran at " + str(readable_time) + "\n\n")
+        #f.write("------ LOG FILE ------\n")
+        #f.write("Model ran at " + str(readable_time) + "\n\n")
 
         f.write("Hyperparameters:\n")
 
         for key, value in hyper_params.items():
             f.write(key + " = " + str(value) + "\n")
+            """"
         f.write("\n\nLayers:\n")
         for layer in layers:
             if layer.name == "linear":
@@ -316,7 +317,10 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
             if layer.name == "relu":
                 f.write(layer.name + "\n")
             if layer.name == "dropout":
-                f.write(layer.name + "(p=" + str(layer.p) + ")\n")
+                f.write(layer.name + "(p=" + str(layer.p) +)
+                """
+        f.write("Training Loss: " + str(train_loss)+"\n")
+        f.write("Validation Loss: " + str(val_loss))
 
     f.close()
 
@@ -382,11 +386,16 @@ def train_fm(is_gpu_run=False):
     trainer.train(x_train_pre, y_train, x_val_pre, y_val)
 
     # Evaluate results
-    print("Final train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
-    print("Final validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+    train_loss=trainer.eval_loss(x_train_pre, y_train)
+    val_loss=trainer.eval_loss(x_val_pre, y_val)
+
+
+    print("Final train loss = {0:.2f}".format(train_loss))
+    print("Final validation loss = {0:.2f}".format(val_loss))
+
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time)
+    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
 
 # TODO: could abstract this further to reduce code repetition
 def train_roi(is_gpu_run=False):
