@@ -52,13 +52,49 @@ def predict_hidden(model,hidden_dataset):
     print(train_preds)
 
 
->>>>>>> evaluation of trained network
+
+def evaluate_architecture(model_path,dataset,problem_type):
+    #w = torch.load(model_path)
+    checkpoint = torch.load(model_path+"20190226_203050_model_model.pt")
+
+    model = load_torch_model(model_path + "20190226_203050_model_model.pt", model_path + "20190226_203050_model_layers.pickle")
+    f=open(model_path+"parameters.txt")
+    model_hyperparams = f.read()
+    print(model_hyperparams)
+    if problem_type== "classification":
+        train_preds= model.forward(dataset[:, :3])
+        train_preds = train_preds.detach().numpy().argmax(axis=1).squeeze()
+        train_targets = (dataset[:, 3:6]).argmax(axis=1).squeeze()
+        print("Classification Confusion Matrix")
+        conf_matrix=confusion_matrix(train_targets, train_preds)
+        print(conf_matrix)
+        print("\n")
+        recall=recall_calculator(conf_matrix)
+        print("Recall: ", recall)
+
+        precision=precision_calculator(conf_matrix)
+        print("Precision: ", precision)
+
+        f1=f1_score_calculator(precision,recall)
+        print("F1 Score: ", f1)
+
+
+
+
+
+    #loss=(checkpoint['Loss'])
+
 
 def main():
 
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
+    dataset = np.loadtxt("FM_dataset.dat")
+    model_path = "output/learn_fm/20190226_203050/"
+    problem_type="classification"
+    evaluate_architecture(model_path,dataset,problem_type)
+
 
     dataset = np.loadtxt("FM_dataset.dat")
     model_path = "output/learn_fm/20190227_123832/"
@@ -66,16 +102,10 @@ def main():
     evaluate_architecture(model_path, dataset)
     predict_hidden(model,dataset)
 
-<<<<<<< HEAD
-    # #######################################################################
-    # #                       ** END OF YOUR CODE **
-    # #######################################################################
-=======
 
     #######################################################################
     #                       ** END OF YOUR CODE **
     #######################################################################
->>>>>>> evaluation of trained network
     # illustrate_results_FM(network, prep)
 
 
