@@ -17,7 +17,7 @@ from sklearn.metrics import confusion_matrix
 from torch_utils import *
 from evaluation_utils import *
 
-
+from imblearn.over_sampling import SMOTE, RandomOverSampler
 
 class SequentialNet(nn.Module):
 
@@ -409,7 +409,42 @@ def train_fm(is_gpu_run=False):
         #confusion matrix
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
+
+class ROIResampler():
+
+    def __init__(self, x_data, y_data, majority_idx, create_synthetic = False):
+        self.x_data = x_data
+        self.y_data = y_data
+        self.full_data = np.concatenate((self.x_data,self.y_data), axis=1)
+
+        if create_synthetic == True:
+            self.majority_idx = majority_idx
+            self.majority_data = self.full_data[self.full_data[:,self.majority_idx]==1,:]
+            self.resampling_data = self.full_data[self.full_data[:,self.majority_idx]!=1,:]
+
+        else:
+            self.resampling_data = self.full_data
+
+        self.x_train = self.resampling_data[:,:3]
+        self.y_train = self.resampling_data[:,3:]
+
+    def resample(self):
+        y_consolidated = np.argmax(self.y_train,axis=1)
+        sm = SMOTE(random_state=2)
+        ros = RandomOverSampler(random_state=42)
+        X_train_res, y_train_res = ros.fit_sample(self.x_train,y_consolidated.ravel())
+
+        x_final_training = np.asarray(X_train_res)
+        y_final_training = np.asarray(y_train_res)
+
+        b = np.zeros((y_final_training.shape[0],4))
+        b[np.arange(y_final_training.shape[0]), y_final_training] = 1
+        y_final_training = b
+
+        print(x_final_training.shape)
+        print(y_final_training.shape)
+
+        return x_final_training, y_final_training
 
 # TODO: could abstract this further to reduce code repetition
 def train_roi(is_gpu_run=False):
@@ -432,6 +467,10 @@ def train_roi(is_gpu_run=False):
     x_train_pre = x_train
     x_val_pre = x_val
     x_test_pre = x_test
+
+    resampler = ROIResampler(x_train,y_train,6)
+    x_train_res, y_train_res = resampler.resample()
+
 
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
@@ -469,18 +508,18 @@ def train_roi(is_gpu_run=False):
         log_output_path=output_path
     )
 
-    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
-    train_loss=trainer.eval_loss(x_train_pre, y_train)
+    trainer.train(x_train_res, y_train_res, x_val_pre, y_val)
+    train_loss=trainer.eval_loss(x_train_res, y_train_res)
     val_loss=trainer.eval_loss(x_val_pre, y_val)
     # Evaluate results
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
 
-    print(network.forward(x_train_pre))
+    print(network.forward(x_train_res))
     print((y_train))
 
-    train_preds = (network.forward(x_train_pre)).detach().numpy().argmax(axis=1).squeeze()
-    train_targ = y_train.argmax(axis=1).squeeze()
+    train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
+    train_targ = y_train_res.argmax(axis=1).squeeze()
    # print(train_preds)
    # print(train_targ)
 
