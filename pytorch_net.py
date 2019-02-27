@@ -293,11 +293,8 @@ def create_output_folder(run_type):
     return output_path, readable_time
 
 
-<<<<<<< HEAD
+
 def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss, train_conf = None, val_conf = None):
-=======
-def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss):
->>>>>>> 59651d2607b6f79e5cd725096303e3dcd044578f
     """
     Saves training output to file
     """
@@ -315,7 +312,7 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
 
         for key, value in hyper_params.items():
             f.write(key + " = " + str(value) + "\n")
-<<<<<<< HEAD
+
         f.write("\n")
         if train_conf != None:
             for key, value in train_conf.items():
@@ -324,8 +321,6 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
             for key, value in val_conf.items():
                 f.write(key + " = " + str(value) + "\n")
             f.write("\n")
-=======
->>>>>>> 59651d2607b6f79e5cd725096303e3dcd044578f
             """"
         f.write("\n\nLayers:\n")
         for layer in layers:
@@ -350,12 +345,6 @@ def train_fm(is_gpu_run=False):
 
     # Create an output folder for results of this run
     output_path, readable_time = create_output_folder("learn_fm")
-<<<<<<< HEAD
-=======
-
-    # Load and prepare data
-    dataset = np.loadtxt("FM_dataset.dat")
->>>>>>> 59651d2607b6f79e5cd725096303e3dcd044578f
 
     # Load and prepare data
     dataset = np.loadtxt("FM_dataset.dat")
@@ -363,16 +352,11 @@ def train_fm(is_gpu_run=False):
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
     # TODO: preprocess the data
-<<<<<<< HEAD
+
     train_prep = TorchPreprocessor(x_train,-1,1)
     x_train_pre = train_prep.apply(x_train)
     x_val_pre = train_prep.apply(x_val)
     x_test_pre = train_prep.apply(x_test)
-=======
-    x_train_pre = x_train
-    x_val_pre = x_val
-    x_test_pre = x_test
->>>>>>> 59651d2607b6f79e5cd725096303e3dcd044578f
 
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
@@ -422,11 +406,7 @@ def train_fm(is_gpu_run=False):
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
 
-<<<<<<< HEAD
         #confusion matrix
-
-=======
->>>>>>> 59651d2607b6f79e5cd725096303e3dcd044578f
 
     # Save model + hyperparamers to file
     save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
@@ -501,8 +481,8 @@ def train_roi(is_gpu_run=False):
 
     train_preds = (network.forward(x_train_pre)).detach().numpy().argmax(axis=1).squeeze()
     train_targ = y_train.argmax(axis=1).squeeze()
-    print(train_preds)
-    print(train_targ)
+   # print(train_preds)
+   # print(train_targ)
 
     conf_matrix=confusion_matrix(train_preds,train_targ)
     recall=recall_calculator(conf_matrix)
