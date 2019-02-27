@@ -7,6 +7,7 @@ from pytorch_net import SequentialNet
 # Named tuples available globally
 LinearLayer = collections.namedtuple("LinearLayer", "name in_dim out_dim")
 ReluLayer = collections.namedtuple("ReluLayer", "name")
+TanhLayer = collections.namedtuple("TanhLayer", "name")
 SoftmaxLayer = collections.namedtuple("SoftmaxLayer", "name")
 SigmoidLayer = collections.namedtuple("SigmoidLayer", "name")
 DropoutLayer = collections.namedtuple("DropoutLayer", "name p")

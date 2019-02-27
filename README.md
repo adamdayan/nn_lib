@@ -21,6 +21,7 @@ Then view port 6006 in your browser.
 
 Create new environment (use site packages to get majority of reqs from
 Nuric bitbucket):
+
 ```
 virtualenv -p /usr/bin/python3.6 --system-site-packages venv_azure
 
@@ -28,7 +29,7 @@ virtualenv -p /usr/bin/python3.6 --system-site-packages venv_azure
 
 Activate new environment:
 ```
-venv_azure/bin/activate
+source venv_azure/bin/activate
 ```
 **NB**: add this folder to .gitgnore immediately as it's huge. Also
 add it to .amlignore (see below)

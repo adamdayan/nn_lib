@@ -37,6 +37,8 @@ class SequentialNet(nn.Module):
                 self._layers.append(nn.ReLU())
             elif layer.name == "sigmoid":
                 self._layers.append(nn.Sigmoid())
+            elif layer.name == "tanh":
+                self._layers.append(nn.Tanh())
             elif layer.name == "dropout":
                 self._layers.append(nn.Dropout(p=layer.p))
             elif layer.name == "softmax":
@@ -342,10 +344,13 @@ def train_fm(is_gpu_run=False):
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
-              ReluLayer(name="relu"),
+              TanhLayer(name="tanh"),
               # DropoutLayer(name="dropout", p=0.2),
               LinearLayer(name="linear", in_dim=32, out_dim=32),
-              ReluLayer(name="relu"),
+              TanhLayer(name="tanh"),
+              # DropoutLayer(name="dropout", p=0.5),
+              # LinearLayer(name="linear", in_dim=64, out_dim=64),
+              # TanhLayer(name="tanh"),
               # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=32, out_dim=3)]
 
