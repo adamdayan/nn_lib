@@ -12,9 +12,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
 from pytorch_pp import TorchPreprocessor
+from sklearn.metrics import confusion_matrix
 from torch_utils import *
+from evaluation_utils import *
 
 
 class SequentialNet(nn.Module):
@@ -291,7 +292,7 @@ def create_output_folder(run_type):
     return output_path, readable_time
 
 
-def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss):
+def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss, train_conf = None, val_conf = None):
     """
     Saves training output to file
     """
@@ -309,6 +310,14 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
 
         for key, value in hyper_params.items():
             f.write(key + " = " + str(value) + "\n")
+        f.write("\n")
+        if train_conf != None:
+            for key, value in train_conf.items():
+                f.write(key + " = " + str(value) + "\n")
+            f.write("\n")
+            for key, value in val_conf.items():
+                f.write(key + " = " + str(value) + "\n")
+            f.write("\n")
             """"
         f.write("\n\nLayers:\n")
         for layer in layers:
@@ -364,7 +373,7 @@ def train_fm(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 1000,
+                    'nb_epoch': 10,
                     'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
@@ -393,6 +402,8 @@ def train_fm(is_gpu_run=False):
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
 
+        #confusion matrix
+
 
     # Save model + hyperparamers to file
     save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
@@ -403,6 +414,7 @@ def train_roi(is_gpu_run=False):
     # Device configuration
     device = torch.device('cuda' if is_gpu_run else 'cpu')
     print("Running on device " + str(device))
+
 
     # Create an output folder for results of this run
     output_path, readable_time = create_output_folder("learn_roi")
@@ -435,7 +447,7 @@ def train_roi(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 1000,
+                    'nb_epoch': 10,
                     'learning_rate': 0.005,
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
@@ -455,13 +467,48 @@ def train_roi(is_gpu_run=False):
     )
 
     trainer.train(x_train_pre, y_train, x_val_pre, y_val)
-
+    train_loss=trainer.eval_loss(x_train_pre, y_train)
+    val_loss=trainer.eval_loss(x_val_pre, y_val)
     # Evaluate results
-    print("Final train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
-    print("Final validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+    print("Final train loss = {0:.2f}".format(train_loss))
+    print("Final validation loss = {0:.2f}".format(val_loss))
+
+    print(network.forward(x_train_pre))
+    print((y_train))
+
+    train_preds = (network.forward(x_train_pre)).detach().numpy().argmax(axis=1).squeeze()
+    train_targ = y_train.argmax(axis=1).squeeze()
+    print(train_preds)
+    print(train_targ)
+
+    conf_matrix=confusion_matrix(train_preds,train_targ)
+    recall=recall_calculator(conf_matrix)
+    precision=precision_calculator(conf_matrix)
+    f1=f1_score_calculator(precision,recall)
+
+    Train_confusion = {
+    "Train Confusion Matrix" + "\n" : conf_matrix,
+    'Recall': recall,
+    'Precision' : precision,
+    'F1' : f1}
+
+    val_preds = (network.forward(x_val_pre)).detach().numpy().argmax(axis=1).squeeze()
+    val_targ = y_val.argmax(axis=1).squeeze()
+
+    conf_matrix=confusion_matrix(val_preds,val_targ)
+    recall=recall_calculator(conf_matrix)
+    precision=precision_calculator(conf_matrix)
+    f1=f1_score_calculator(precision,recall)
+
+    Val_confusion = {
+    "Val Confusion Matrix" + "\n"  : conf_matrix,
+    'Recall' : recall,
+    'Precision' : precision,
+    'F1' : f1}
+
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time)
+    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, Train_confusion, Val_confusion)
 
 
 if __name__ == "__main__":
