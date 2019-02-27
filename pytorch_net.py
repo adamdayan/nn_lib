@@ -484,7 +484,7 @@ def train_roi(is_gpu_run=False):
    # print(train_preds)
    # print(train_targ)
 
-    conf_matrix=confusion_matrix(train_preds,train_targ)
+    conf_matrix=confusion_matrix(train_targ,train_preds)
     recall=recall_calculator(conf_matrix)
     precision=precision_calculator(conf_matrix)
     f1=f1_score_calculator(precision,recall)
@@ -498,7 +498,7 @@ def train_roi(is_gpu_run=False):
     val_preds = (network.forward(x_val_pre)).detach().numpy().argmax(axis=1).squeeze()
     val_targ = y_val.argmax(axis=1).squeeze()
 
-    conf_matrix=confusion_matrix(val_preds,val_targ)
+    conf_matrix=confusion_matrix(val_targ,val_preds)
     recall=recall_calculator(conf_matrix)
     precision=precision_calculator(conf_matrix)
     f1=f1_score_calculator(precision,recall)
