@@ -1,7 +1,4 @@
 import collections
-import time
-import datetime
-import os
 import sys
 import getopt
 
@@ -13,13 +10,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import matplotlib.pyplot as plt
+
 from pytorch_pp import TorchPreprocessor
 from sklearn.metrics import confusion_matrix
 from torch_utils import *
 from evaluation_utils import *
 
 from imblearn.over_sampling import SMOTE, RandomOverSampler
-
 
 class SequentialNet(nn.Module):
 
@@ -324,7 +322,7 @@ class TorchTrainer():
 
             target_tensor = target_tensor.to(self.device)
             loss = self.loss_criterion(output_tensor, target_tensor)
-            
+
             return loss.item()
 
 
@@ -364,68 +362,6 @@ def split_train_val_test(dataset, last_feature_idx):
     return x_train, y_train, x_val, y_val, x_test, y_test
 
 
-def create_output_folder(run_type):
-    """
-    Creates an output folder for this run
-    """
-    # Create a timestamp for saving results
-    timestamp = time.time()
-    timestamp = datetime.datetime.fromtimestamp(timestamp)
-    readable_time = str(timestamp.year) + str(timestamp.month).zfill(2) + str(timestamp.day).zfill(2) + "_" + str(timestamp.hour).zfill(2) + str(timestamp.minute).zfill(2) + str(timestamp.second).zfill(2)
-
-    # Create an output folder for this run
-    output_path = "output/" + run_type + "/" + readable_time
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-        print("Creating new folder: " + output_path)
-
-    return output_path, readable_time
-
-
-
-def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss, train_conf = None, val_conf = None):
-    """
-    Saves training output to file
-    """
-
-    # Save pytorch model
-    save_torch_model(network, layers, output_path + "/" + readable_time + "_model")
-
-    # Save hyperparameters to log file
-    parameter_out_file = output_path + "/parameters.txt"
-    with open(parameter_out_file, 'w') as f:
-        #f.write("------ LOG FILE ------\n")
-        #f.write("Model ran at " + str(readable_time) + "\n\n")
-
-        f.write("Hyperparameters:\n")
-
-        for key, value in hyper_params.items():
-            f.write(key + " = " + str(value) + "\n")
-
-        f.write("\n")
-        if train_conf != None:
-            for key, value in train_conf.items():
-                f.write(key + " = " + str(value) + "\n")
-            f.write("\n")
-            for key, value in val_conf.items():
-                f.write(key + " = " + str(value) + "\n")
-            f.write("\n")
-            """"
-        f.write("\n\nLayers:\n")
-        for layer in layers:
-            if layer.name == "linear":
-                f.write(layer.name + "(" + str(layer.in_dim) + ", " + str(layer.out_dim) + ")\n")
-            if layer.name == "relu":
-                f.write(layer.name + "\n")
-            if layer.name == "dropout":
-                f.write(layer.name + "(p=" + str(layer.p) +)
-                """
-        f.write("Training Loss: " + str(train_loss)+"\n")
-        f.write("Validation Loss: " + str(val_loss))
-
-    f.close()
-        
-    
 def train_fm(is_gpu_run=False):
 
     # Device configuration
@@ -441,7 +377,6 @@ def train_fm(is_gpu_run=False):
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
     # TODO: preprocess the data
-
     train_prep = TorchPreprocessor(x_train,-1,1)
     x_train_pre = train_prep.apply(x_train)
     x_val_pre = train_prep.apply(x_val)
@@ -465,7 +400,6 @@ def train_fm(is_gpu_run=False):
     print(network)
 
     # Add the network to a trainer and train
-
     hyper_params = {'batch_size': 32,
                     'nb_epoch': 1000,
                     'learning_rate': 0.005,
@@ -492,14 +426,34 @@ def train_fm(is_gpu_run=False):
     train_loss=trainer.eval_loss(x_train_pre, y_train)
     val_loss=trainer.eval_loss(x_val_pre, y_val)
 
-
+    # Save model + hyperparamers to file
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
     save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
 
-        #confusion matrix
+    # Plot learning curves
+    # to check how well model is training (e.g. is there overfitting)
+    plt.figure(figsize=(20,10))
+    plt.suptitle("Loss vs epochs for " + hyper_params['loss_fun'])
 
-    # Save model + hyperparamers to file
+    # Description of the hyperparams
+    hyperparams_text = "Hyperparameters: \n " + \
+                       "- lr = " + str(hyper_params['learning_rate']) + \
+                       "\n - batch_size = " + str(hyper_params['batch_size']) + \
+                       "\n - loss function = " + hyper_params['loss_fun'] + \
+                       "\n - number of epochs = " + str(hyper_params['nb_epoch'])
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    plt.figtext(0.75, 0.75, hyperparams_text, bbox=props)
+
+    # Plot loss vs number of epochs
+    plt.plot(trainer.epochs_w_loss_measure, trainer.training_losses)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.validation_losses)
+    plt.legend(['training', 'validation'], loc='upper left')
+    plt.xlabel("Number of epochs")
+    plt.ylabel("Loss (" + hyper_params['loss_fun'] + ")")
+
+    plt.savefig(output_path + "/" + hyper_params['loss_fun'] + "_loss_plot.png")
+
 
 class ROIResampler():
 
@@ -543,7 +497,6 @@ def train_roi(is_gpu_run=False):
     # Device configuration
     device = torch.device('cuda' if is_gpu_run else 'cpu')
     print("Running on device " + str(device))
-
 
     # Create an output folder for results of this run
     output_path, readable_time = create_output_folder("learn_roi")
@@ -603,6 +556,7 @@ def train_roi(is_gpu_run=False):
     trainer.train(x_train_res, y_train_res, x_val_pre, y_val)
     train_loss=trainer.eval_loss(x_train_res, y_train_res)
     val_loss=trainer.eval_loss(x_val_pre, y_val)
+
     # Evaluate results
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
@@ -612,8 +566,6 @@ def train_roi(is_gpu_run=False):
 
     train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
     train_targ = y_train_res.argmax(axis=1).squeeze()
-   # print(train_preds)
-   # print(train_targ)
 
     conf_matrix=confusion_matrix(train_targ,train_preds)
     recall=recall_calculator(conf_matrix)
@@ -642,7 +594,7 @@ def train_roi(is_gpu_run=False):
 
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, Train_confusion, Val_confusion)
+    save_training_output(network, layers, hyper_params, output_path, readable_time)
 
 
 def optimise_fm():
@@ -848,10 +800,7 @@ def optimise_roi():
 
     # Save model + hyperparamers to file
     save_training_output(network, layers, hyper_params, output_path, readable_time)
-                         
-        
 
-    
 
 if __name__ == "__main__":
 
