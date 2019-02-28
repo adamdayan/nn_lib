@@ -401,7 +401,7 @@ def train_fm(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 1000,
+                    'nb_epoch': 500,
                     'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
@@ -425,11 +425,12 @@ def train_fm(is_gpu_run=False):
     # Evaluate results
     train_loss=trainer.eval_loss(x_train_pre, y_train)
     val_loss=trainer.eval_loss(x_val_pre, y_val)
+    test_loss=trainer.eval_loss(x_test_pre, y_test)
 
     # Save model + hyperparamers to file
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
-    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
+    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, test_loss)
 
     # Plot learning curves
     # to check how well model is training (e.g. is there overfitting)
@@ -556,13 +557,11 @@ def train_roi(is_gpu_run=False):
     trainer.train(x_train_res, y_train_res, x_val_pre, y_val)
     train_loss=trainer.eval_loss(x_train_res, y_train_res)
     val_loss=trainer.eval_loss(x_val_pre, y_val)
+    test_loss=trainer.eval_loss(x_test_pre, y_test)
 
     # Evaluate results
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
-
-    print(network.forward(x_train_res))
-    print((y_train))
 
     train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
     train_targ = y_train_res.argmax(axis=1).squeeze()
@@ -594,7 +593,8 @@ def train_roi(is_gpu_run=False):
 
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time)
+    save_training_output(network, layers, hyper_params, output_path, readable_time
+                         , train_loss, val_loss, test_loss)
 
 
 def optimise_fm():
@@ -631,7 +631,6 @@ def optimise_fm():
     
     optimisation_parameters = [
         (10,200),
-
         (0.0005, 0.2),
         (40,200)        
     ]

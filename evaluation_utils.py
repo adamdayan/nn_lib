@@ -2,6 +2,7 @@ import numpy as np
 import pprint
 from sklearn.metrics import confusion_matrix
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import LabelBinarizer
 
 
 def evaluate_architecture(model_path, dataset, problem_type="regression"):
@@ -40,8 +41,9 @@ def predict_hidden(model, hidden_dataset, problem_type="regression"):
         preds = preds.argmax(axis=1) # .squeeze()
         # One-hot encode the output - i.e. force the model to make a decision
         # TODO: Adam to get this working
-        enc = OneHotEncoder(handle_unknown="ignore")
-        preds = enc.fit_transform(preds).toarray()
+        enc = LabelBinarizer()
+        preds = enc.fit_transform(preds)
+        
         pprint.pprint(preds)
 
 

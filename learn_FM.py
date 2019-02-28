@@ -11,7 +11,8 @@ def main(dataset_filepath):
     dataset = np.loadtxt(dataset_filepath)
 
     # Load best model and evaluate
-    model_path = "output/learn_fm/best_model/"
+    #model_path = "output/learn_fm/best_model/"
+    model_path = "output/learn_fm/20190228_172456/"
     model = load_torch_model(model_path + "model.pt", model_path + "layers.pickle")
     evaluate_architecture(model_path, dataset)
 

@@ -34,7 +34,9 @@ def create_output_folder(run_type):
     return output_path, readable_time
 
 
-def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss, train_conf = None, val_conf = None):
+def save_training_output(network, layers, hyper_params, output_path
+                         ,readable_time,train_loss,val_loss, test_loss,
+                         train_conf = None, val_conf = None):
     """
     Saves training output to file
     """
@@ -72,7 +74,8 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
                 f.write(layer.name + "(p=" + str(layer.p) +)
                 """
         f.write("Training Loss: " + str(train_loss)+"\n")
-        f.write("Validation Loss: " + str(val_loss))
+        f.write("Validation Loss: " + str(val_loss)+ "\n")
+        f.write("Test Loss: " + str(test_loss) + "\n")
 
     f.close()
 

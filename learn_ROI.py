@@ -9,8 +9,9 @@ def main(dataset_filepath):
     # Load dataset
     dataset = np.loadtxt(dataset_filepath)
 
-    # Load best model and evaluate
-    model_path = "output/learn_roi/best_model/"
+    # Load best model and evaluate 
+    #model_path = "output/learn_roi/best_model/"
+    model_path = "output/learn_roi/20190228_175318/"
     model = load_torch_model(model_path + "model.pt", model_path + "layers.pickle")
     evaluate_architecture(model_path, dataset, problem_type="classification")
 
