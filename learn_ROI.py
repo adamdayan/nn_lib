@@ -12,8 +12,8 @@ def main(dataset_filepath):
     # Load best model and evaluate
     model_path = "output/learn_roi/best_model/"
     model, preprocessor = load_torch_model(model_path + "model.pt",
-                             model_path + "layers.pickle",
-                             model_path + "preprocessor.pickle")
+                                           model_path + "layers.pickle",
+                                           model_path + "x_preprocessor.pickle")
     evaluate_architecture(model_path, dataset)
 
     # Normalise data using training pre-processor

@@ -30,11 +30,10 @@ def evaluate_architecture(model_path, dataset, problem_type="regression"):
     #     print("F1 Score: ", f1)
 
 
-def predict_hidden(model, hidden_dataset, problem_type="regression"):
+def predict_hidden(model, hidden_dataset, problem_type="regression", target_pp=None):
 
     preds = model.forward(hidden_dataset[:, :3])
     preds = preds.detach().numpy()
-    pprint.pprint(preds)
 
     if problem_type == "classification":
         preds = preds.argmax(axis=1) # .squeeze()
@@ -43,6 +42,16 @@ def predict_hidden(model, hidden_dataset, problem_type="regression"):
         enc = OneHotEncoder(handle_unknown="ignore")
         preds = enc.fit_transform(preds).toarray()
         pprint.pprint(preds)
+
+    elif problem_type == "regression":
+
+        # If this is a regression task and we normalised the output for training then revert it
+        pprint.pprint(preds)
+        if target_pp is not None:
+            preds = target_pp.revert(preds)
+            pprint.pprint(preds)
+        else:
+            pprint.pprint(preds)
 
 
 def precision_calculator(confusion_matrix):

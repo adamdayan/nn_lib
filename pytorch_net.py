@@ -339,12 +339,18 @@ def train_fm(is_gpu_run=False):
     # Split data
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
-    # Preprocess the data
-    train_prep = TorchPreprocessor(x_train,-1,1)
-    x_train_pre = train_prep.apply(x_train)
-    x_val_pre = train_prep.apply(x_val)
-    x_test_pre = train_prep.apply(x_test)
+    # Preprocess the features
+    x_preproc = TorchPreprocessor(x_train,-1,1)
+    x_train_pre = x_preproc.apply(x_train)
+    x_val_pre = x_preproc.apply(x_val)
+    x_test_pre = x_preproc.apply(x_test)
 
+    # Also preprocess the targets for regression
+    y_preproc = TorchPreprocessor(y_train, -1, 1)
+    y_train_pre = x_preproc.apply(y_train)
+    y_val_pre = x_preproc.apply(y_val)
+    y_test_pre = x_preproc.apply(y_test)
+    
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
@@ -364,7 +370,7 @@ def train_fm(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 100,
+                    'nb_epoch': 50,
                     'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
@@ -383,16 +389,24 @@ def train_fm(is_gpu_run=False):
         log_output_path=output_path
     )
 
-    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
+    trainer.train(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
 
     # Evaluate results
-    train_loss=trainer.eval_loss(x_train_pre, y_train)
-    val_loss=trainer.eval_loss(x_val_pre, y_val)
+    train_loss=trainer.eval_loss(x_train_pre, y_train_pre)
+    val_loss=trainer.eval_loss(x_val_pre, y_val_pre)
 
     # Save model + hyperparamers to file
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
-    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time, train_loss, val_loss)
+    save_training_output(network,
+                         layers,
+                         x_preproc,
+                         hyper_params,
+                         output_path,
+                         readable_time,
+                         train_loss,
+                         val_loss,
+                         y_preprocessor=y_preproc)
 
     # Plot learning curves
     # to check how well model is training (e.g. is there overfitting)

@@ -37,20 +37,21 @@ def create_output_folder(run_type):
 
 def save_training_output(network,
                          layers,
-                         preprocessor,
+                         x_preprocessor,
                          hyper_params,
                          output_path,
                          readable_time,
                          train_loss,
                          val_loss,
                          train_conf = None,
-                         val_conf = None):
+                         val_conf = None,
+                         y_preprocessor = None):
     """
     Saves training output to file
     """
-
+    
     # Save pytorch model
-    save_torch_model(network, layers, preprocessor, output_path)
+    save_torch_model(network, layers, x_preprocessor, output_path, y_preprocessor=y_preprocessor)
 
     # Save hyperparameters to log file
     parameter_out_file = output_path + "/parameters.txt"
@@ -87,7 +88,11 @@ def save_training_output(network,
     f.close()
 
 
-def save_torch_model(model, layers, preprocessor, filepath):
+def save_torch_model(model,
+                     layers,
+                     x_preprocessor,
+                     filepath,
+                     y_preprocessor=None):
     """
     Saves any pytorch model to file. Use .pt extension
     """
@@ -98,22 +103,39 @@ def save_torch_model(model, layers, preprocessor, filepath):
     with open(filepath + "layers.pickle", "wb") as f:
         pickle.dump(layers, f)
 
-    # Pickle preproccesor
-    with open(filepath + "preprocessor.pickle", "wb") as f:
-        pickle.dump(preprocessor, f)
+    # Pickle input preproccesor
+    with open(filepath + "x_preprocessor.pickle", "wb") as f:
+        pickle.dump(x_preprocessor, f)
+
+    # Pickle target preproccesor
+    if y_preprocessor is not None:
+        with open(filepath + "y_preprocessor.pickle", "wb") as f:
+            pickle.dump(y_preprocessor, f)
 
 
-def load_torch_model(model_filename, model_layers_filename, preprocessor_filename):
+def load_torch_model(
+        model_filename,
+        model_layers_filename,
+        x_preprocessor_filename,
+        y_preprocessor_filename=None):
     """
     Loads a model from a .pt file and preprocessor from .pickle file
     """
-    # Load preprocessor
-    with open(preprocessor_filename, "rb") as f:
-        preprocessor = pickle.load(f)
+    # Load x preprocessor
+    with open(x_preprocessor_filename, "rb") as f:
+        x_preprocessor = pickle.load(f)
 
-    print("Preprocessor loaded:")
-    pprint.pprint(vars(preprocessor))
+    print("x_preprocessor loaded:")
+    pprint.pprint(vars(x_preprocessor))
 
+    # Load y preprocessor (if required)
+    if y_preprocessor_filename is not None:
+        with open(y_preprocessor_filename, "rb") as f:
+            y_preprocessor = pickle.load(f)
+
+        print("y_preprocessor loaded:")
+        pprint.pprint(vars(y_preprocessor))
+    
     # Load layers config
     with open(model_layers_filename, "rb") as f:
         model_layers = pickle.load(f)
@@ -125,4 +147,4 @@ def load_torch_model(model_filename, model_layers_filename, preprocessor_filenam
 
     # Switch eval mode on for inference
     model.eval()
-    return model, preprocessor
+    return model, x_preprocessor, y_preprocessor
