@@ -2,3 +2,5 @@
 venv_azure/
 output/
 .idea/
+nnprof.profile
+scikit_opt/
