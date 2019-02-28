@@ -161,6 +161,7 @@ class TorchTrainer():
                     # https://discuss.pytorch.org/t/loss-functions-for-batches/20488
                     batch_target = torch.from_numpy(batched_target[idx]).type(torch.long)
                     batch_target = batch_target.argmax(1)
+                    
                 batch_target = batch_target.to(self.device)
                 batch_loss = self.loss_criterion(batch_output, batch_target)
 
@@ -349,7 +350,7 @@ def split_train_val_test(dataset, last_feature_idx):
     y_val = y_rem[:val_idx]
 
     x_test = x_rem[val_idx:]
-    y_test = x_rem[val_idx:]
+    y_test = y_rem[val_idx:]
 
     print("Input data split into train, val, test with shapes:")
     print("- x_train = " + str(x_train.shape))
@@ -442,7 +443,7 @@ def train_fm(is_gpu_run=False):
               # LinearLayer(name="linear", in_dim=64, out_dim=64),
               # TanhLayer(name="tanh"),
               # DropoutLayer(name="dropout", p=0.5),
-              LinearLayer(name="linear", in_dim=81, out_dim=3)]
+              LinearLayer(name="linear", in_dim=32, out_dim=3)]
 
     network = SequentialNet(layers, device)
     print("Network instatiated:")
@@ -639,7 +640,7 @@ def optimise_fm():
     )
 
     trainer.train(x_train_pre, y_train, x_val_pre, y_val)
-
+    
     # Evaluate results
     print("Optimised train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
     print("Optimised validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
@@ -688,7 +689,7 @@ def optimise_roi():
     result = gp_minimize(trainer.optimise_hyperparameters,
                          optimisation_parameters,
                          acq_func="EI",
-                         n_calls=50,
+                         n_calls=30,
                          n_random_starts=5,
                          noise=0.1**2,
                          random_state=123
@@ -700,7 +701,7 @@ def optimise_roi():
 
     print("Training model on optimal parameters")
     optimal_parameters_list = result.get("x")
-    output_path, readable_time = create_output_folder("best_fm")
+    output_path, readable_time = create_output_folder("best_roi")
 
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
@@ -721,7 +722,7 @@ def optimise_roi():
     hyper_params = {'batch_size': optimal_parameters_list[0],
                     'nb_epoch': 1000,
                     'learning_rate': optimal_parameters_list[1],
-                    'loss_fun': "mse",
+                    'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
     
@@ -737,7 +738,7 @@ def optimise_roi():
         device=device,
         log_output_path=output_path
     )
-
+    
     trainer.train(x_train_pre, y_train, x_val_pre, y_val)
 
     # Evaluate results
