@@ -16,6 +16,7 @@ import torch.optim as optim
 
 from pytorch_pp import TorchPreprocessor
 from torch_utils import *
+
     
 
 
@@ -288,6 +289,7 @@ class TorchTrainer():
                 target_tensor = torch.from_numpy(target_dataset_val).float()
             elif self.problem_type == "classification":
                 target_tensor = torch.from_numpy(target_dataset_val).type(torch.long)
+
                 target_tensor = target_tensor.argmax(1)
 
             validation_loss = self.loss_criterion(output_tensor, target_tensor)
@@ -576,6 +578,7 @@ def optimise_fm():
     
     optimisation_parameters = [
         (10,200),
+
         (0.0005, 0.2),
         (10,200)        
     ]
@@ -603,6 +606,7 @@ def optimise_fm():
               ReluLayer(name="relu"),
               # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=optimal_parameters_list[2], out_dim=optimal_parameters_list[2]),
+
               ReluLayer(name="relu"),
               # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=optimal_parameters_list[2], out_dim=3),
