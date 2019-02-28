@@ -2,9 +2,6 @@
 venv_azure/
 output/
 .idea/
-<<<<<<< HEAD
 nnprof.profile
 scikit_opt/
-=======
 venv_imbalance/
->>>>>>> master
