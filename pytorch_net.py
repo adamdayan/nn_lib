@@ -405,6 +405,7 @@ def train_fm(is_gpu_run=False):
 
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
+    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
 
         #confusion matrix
 

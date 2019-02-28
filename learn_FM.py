@@ -55,9 +55,9 @@ def predict_hidden(model,hidden_dataset):
 
 def evaluate_architecture(model_path,dataset,problem_type):
     #w = torch.load(model_path)
-    checkpoint = torch.load(model_path+"20190226_203050_model_model.pt")
+    checkpoint = torch.load(model_path+"20190228_103518_model_model.pt")
 
-    model = load_torch_model(model_path + "20190226_203050_model_model.pt", model_path + "20190226_203050_model_layers.pickle")
+    model = load_torch_model(model_path + "20190228_103518_model_model.pt", model_path + "20190228_103518_model_layers.pickle")
     f=open(model_path+"parameters.txt")
     model_hyperparams = f.read()
     print(model_hyperparams)
