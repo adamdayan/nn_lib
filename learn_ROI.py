@@ -1,27 +1,29 @@
 import numpy as np
 
-from nn_lib import (
-    MultiLayerNetwork,
-    Trainer,
-    Preprocessor,
-    save_network,
-    load_network,
-)
-
 from illustrate import illustrate_results_ROI
+from evaluation_utils import *
+from torch_utils import *
 
+def main(dataset_filepath):
 
-def main():
-    dataset = np.loadtxt("ROI_dataset.dat")
-    #######################################################################
-    #                       ** START OF YOUR CODE **
-    #######################################################################
+    # Load dataset
+    dataset = np.loadtxt(dataset_filepath)
 
-    #######################################################################
-    #                       ** END OF YOUR CODE **
-    #######################################################################
-    illustrate_results_ROI(network, prep)
+    # Load best model and evaluate
+    model_path = "output/learn_roi/best_model/"
+    model = load_torch_model(model_path + "model.pt", model_path + "layers.pickle")
+    evaluate_architecture(model_path, dataset, problem_type="classification")
 
+    # Normalise data using training pre-processor
+    # TODO:
+
+    # Return predictions to user
+    predict_hidden(model, dataset, problem_type="classification")
+    
 
 if __name__ == "__main__":
-    main()
+
+    # TODO: command line arguments
+    dataset_filepath = "ROI_dataset.dat"
+    
+    main(dataset_filepath)
