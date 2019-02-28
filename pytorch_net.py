@@ -239,10 +239,10 @@ class TorchTrainer():
             #build network
             layers = [LinearLayer(name="linear", in_dim=3, out_dim=hidden_layer_neurons),
                       # LinearLayer(name="linear", in_dim=8, out_dim=8),
-                      ReluLayer(name="relu"),
+                      ReluLayer(name="tanh"),
                       # DropoutLayer(name="dropout", p=0.2),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=hidden_layer_neurons),
-                      ReluLayer(name="relu"),
+                      ReluLayer(name="tanh"),
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=3)]
             
@@ -467,7 +467,7 @@ def train_fm(is_gpu_run=False):
     # Add the network to a trainer and train
 
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 10,
+                    'nb_epoch': 1000,
                     'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
@@ -555,11 +555,12 @@ def train_roi(is_gpu_run=False):
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
     # TODO: preprocess the data
-    x_train_pre = x_train
-    x_val_pre = x_val
-    x_test_pre = x_test
+    train_prep = TorchPreprocessor(x_train,-1,1)
+    x_train_pre = train_prep.apply(x_train)
+    x_val_pre = train_prep.apply(x_val)
+    x_test_pre = train_prep.apply(x_test)
 
-    resampler = ROIResampler(x_train,y_train,6)
+    resampler = ROIResampler(x_train_pre,y_train,6)
     x_train_res, y_train_res = resampler.resample()
 
 
@@ -580,7 +581,7 @@ def train_roi(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 10,
+                    'nb_epoch': 100,
                     'learning_rate': 0.005,
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
@@ -654,9 +655,10 @@ def optimise_fm():
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
     # TODO: preprocess the data
-    x_train_pre = x_train
-    x_val_pre = x_val
-    x_test_pre = x_test
+    train_prep = TorchPreprocessor(x_train,-1,1)
+    x_train_pre = train_prep.apply(x_train)
+    x_val_pre = train_prep.apply(x_val)
+    x_test_pre = train_prep.apply(x_test)
 
     network = SequentialNet([LinearLayer(name="linear", in_dim=3, out_dim=32)])
     trainer = TorchTrainer(
@@ -679,13 +681,13 @@ def optimise_fm():
         (10,200),
 
         (0.0005, 0.2),
-        (10,200)        
+        (40,200)        
     ]
 
     result = gp_minimize(trainer.optimise_hyperparameters,
                          optimisation_parameters,
                          acq_func="EI",
-                         n_calls=500,
+                         n_calls=30,
                          n_random_starts=5,
                          noise=0.1**2,
                          random_state=123
@@ -702,11 +704,11 @@ def optimise_fm():
     # Instatiate a network    
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=optimal_parameters_list[2]),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
-              ReluLayer(name="relu"),
+              ReluLayer(name="tanh"),
               # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=optimal_parameters_list[2], out_dim=optimal_parameters_list[2]),
 
-              ReluLayer(name="relu"),
+              ReluLayer(name="tanh"),
               # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=optimal_parameters_list[2], out_dim=3),
               #SoftmaxLayer(name="softmax")
@@ -757,9 +759,10 @@ def optimise_roi():
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
     # TODO: preprocess the data
-    x_train_pre = x_train
-    x_val_pre = x_val
-    x_test_pre = x_test
+    train_prep = TorchPreprocessor(x_train,-1,1)
+    x_train_pre = train_prep.apply(x_train)
+    x_val_pre = train_prep.apply(x_val)
+    x_test_pre = train_prep.apply(x_test)
 
     network = SequentialNet([LinearLayer(name="linear", in_dim=3, out_dim=32)])
     trainer = TorchTrainer(
@@ -818,7 +821,7 @@ def optimise_roi():
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': optimal_parameters_list[0],
-                    'nb_epoch': 1000,
+                    'nb_epoch': 250,
                     'learning_rate': optimal_parameters_list[1],
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
