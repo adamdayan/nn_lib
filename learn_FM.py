@@ -22,7 +22,7 @@ def main(dataset_filepath):
     dataset = x_pp.apply(dataset[:, :3])
 
     # Return predictions to user
-    predict_hidden(model, dataset, target_pp=y_pp)
+    predict_hidden(model, dataset, x_pp, target_pp=y_pp)
 
     
 if __name__ == "__main__":

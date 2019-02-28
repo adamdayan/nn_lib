@@ -11,27 +11,8 @@ def evaluate_architecture(model_path, dataset, problem_type="regression"):
     model_architecture = f.read()
     print(model_architecture)
 
-    # if problem_type== "classification":
-        
-    #     train_preds = model.forward(dataset[:, :3])
-    #     train_preds = train_preds.detach().numpy().argmax(axis=1).squeeze()
-    #     train_targets = (dataset[:, 3:6]).argmax(axis=1).squeeze()
 
-    #     print("Classification Confusion Matrix:")
-    #     conf_matrix = confusion_matrix(train_targets, train_preds)
-    #     print(conf_matrix)
-        
-    #     recall = recall_calculator(conf_matrix)
-    #     print("Recall: ", recall)
-
-    #     precision = precision_calculator(conf_matrix)
-    #     print("Precision: ", precision)
-
-    #     f1 = f1_score_calculator(precision,recall)
-    #     print("F1 Score: ", f1)
-
-
-def predict_hidden(model, hidden_dataset, problem_type="regression", target_pp=None):
+def predict_hidden(model, hidden_dataset, feature_pp, problem_type="regression", target_pp=None):
 
     preds = model.forward(hidden_dataset[:, :3])
     preds = preds.detach().numpy()
@@ -54,6 +35,10 @@ def predict_hidden(model, hidden_dataset, problem_type="regression", target_pp=N
             pprint.pprint(preds)
         else:
             pprint.pprint(preds)
+
+    features = feature_pp.revert(hidden_dataset[:, :3])
+    output = np.hstack((features, preds))
+    np.savetxt(problem_type + ".txt", output)
 
 
 def precision_calculator(confusion_matrix):

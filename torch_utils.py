@@ -131,6 +131,7 @@ def load_torch_model(
     pprint.pprint(vars(x_preprocessor))
 
     # Load y preprocessor (if required)
+    y_preprocessor = None
     if y_preprocessor_filename is not None:
         with open(y_preprocessor_filename, "rb") as f:
             y_preprocessor = pickle.load(f)

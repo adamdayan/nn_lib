@@ -20,7 +20,7 @@ def main(dataset_filepath):
     dataset = x_pp.apply(dataset[:, :3])
     
     # Return predictions to user
-    predict_hidden(model, dataset, problem_type="classification")
+    predict_hidden(model, dataset, x_pp, problem_type="classification")
     
 
 if __name__ == "__main__":
