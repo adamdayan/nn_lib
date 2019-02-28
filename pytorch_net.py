@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import matplotlib.pyplot as plt
 
 from pytorch_pp import TorchPreprocessor
 from torch_utils import *
@@ -387,6 +388,29 @@ def train_fm(is_gpu_run=False):
 
     # Save model + hyperparamers to file
     save_training_output(network, layers, hyper_params, output_path, readable_time)
+
+    # Plot learning curves
+    # to check how well model is training (e.g. is there overfitting)
+    plt.figure(figsize=(20,10))
+    plt.suptitle("Loss vs epochs for " + hyper_params['loss_fun'])
+
+    # Description of the hyperparams
+    hyperparams_text = "Hyperparameters: \n " + \
+                       "- lr = " + str(hyper_params['learning_rate']) + \
+                       "\n - batch_size = " + str(hyper_params['batch_size']) + \
+                       "\n - loss function = " + hyper_params['loss_fun'] + \
+                       "\n - number of epochs = " + str(hyper_params['nb_epoch'])
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    plt.figtext(0.75, 0.75, hyperparams_text, bbox=props)
+
+    # Plot loss vs number of epochs
+    plt.plot(trainer.epochs_w_loss_measure, trainer.training_losses)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.validation_losses)
+    plt.legend(['training', 'validation'], loc='upper left')
+    plt.xlabel("Number of epochs")
+    plt.ylabel("Loss (" + hyper_params['loss_fun'] + ")")
+
+    plt.savefig(output_path + "/" + hyper_params['loss_fun'] + "_loss_plot.png")
 
 # TODO: could abstract this further to reduce code repetition
 def train_roi(is_gpu_run=False):
