@@ -12,11 +12,13 @@ def main(dataset_filepath):
 
     # Load best model and evaluate
     model_path = "output/learn_fm/best_model/"
-    model = load_torch_model(model_path + "model.pt", model_path + "layers.pickle")
+    model, preprocessor = load_torch_model(model_path + "model.pt",
+                             model_path + "layers.pickle",
+                             model_path + "preprocessor.pickle")
     evaluate_architecture(model_path, dataset)
 
     # Normalise data using training pre-processor
-    # TODO:
+    dataset = preprocessor.apply(dataset[:, :3])
 
     # Return predictions to user
     predict_hidden(model, dataset)

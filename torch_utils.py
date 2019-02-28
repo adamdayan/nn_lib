@@ -4,6 +4,7 @@ import os
 import torch
 import pickle
 import collections
+import pprint
 
 from pytorch_net import SequentialNet
 
@@ -34,13 +35,22 @@ def create_output_folder(run_type):
     return output_path, readable_time
 
 
-def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss, train_conf = None, val_conf = None):
+def save_training_output(network,
+                         layers,
+                         preprocessor,
+                         hyper_params,
+                         output_path,
+                         readable_time,
+                         train_loss,
+                         val_loss,
+                         train_conf = None,
+                         val_conf = None):
     """
     Saves training output to file
     """
 
     # Save pytorch model
-    save_torch_model(network, layers, output_path)
+    save_torch_model(network, layers, preprocessor, output_path)
 
     # Save hyperparameters to log file
     parameter_out_file = output_path + "/parameters.txt"
@@ -61,7 +71,7 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
             for key, value in val_conf.items():
                 f.write(key + " = " + str(value) + "\n")
             f.write("\n")
-            """"
+
         f.write("\n\nLayers:\n")
         for layer in layers:
             if layer.name == "linear":
@@ -69,15 +79,15 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
             if layer.name == "relu":
                 f.write(layer.name + "\n")
             if layer.name == "dropout":
-                f.write(layer.name + "(p=" + str(layer.p) +)
-                """
+                f.write(layer.name + "(p=" + str(layer.p) + ")\n")
+
         f.write("Training Loss: " + str(train_loss)+"\n")
         f.write("Validation Loss: " + str(val_loss))
 
     f.close()
 
 
-def save_torch_model(model, layers, filepath):
+def save_torch_model(model, layers, preprocessor, filepath):
     """
     Saves any pytorch model to file. Use .pt extension
     """
@@ -88,24 +98,31 @@ def save_torch_model(model, layers, filepath):
     with open(filepath + "layers.pickle", "wb") as f:
         pickle.dump(layers, f)
 
-def load_torch_model(model_filename, model_layers_filename):
+    # Pickle preproccesor
+    with open(filepath + "preprocessor.pickle", "wb") as f:
+        pickle.dump(preprocessor, f)
+
+
+def load_torch_model(model_filename, model_layers_filename, preprocessor_filename):
     """
-    Loads a model from a .pt file
+    Loads a model from a .pt file and preprocessor from .pickle file
     """
+    # Load preprocessor
+    with open(preprocessor_filename, "rb") as f:
+        preprocessor = pickle.load(f)
+
+    print("Preprocessor loaded:")
+    pprint.pprint(vars(preprocessor))
+
     # Load layers config
     with open(model_layers_filename, "rb") as f:
         model_layers = pickle.load(f)
 
     # Load pytorch model
     model = SequentialNet(layers=model_layers)
-
     model.load_state_dict(torch.load(model_filename))
     print(model)
-    #print(model.state_dict.'bias')
-
-
-    #print(model)
 
     # Switch eval mode on for inference
     model.eval()
-    return model
+    return model, preprocessor

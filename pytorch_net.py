@@ -339,7 +339,7 @@ def train_fm(is_gpu_run=False):
     # Split data
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
-    # TODO: preprocess the data
+    # Preprocess the data
     train_prep = TorchPreprocessor(x_train,-1,1)
     x_train_pre = train_prep.apply(x_train)
     x_val_pre = train_prep.apply(x_val)
@@ -364,7 +364,7 @@ def train_fm(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 1000,
+                    'nb_epoch': 100,
                     'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
@@ -392,7 +392,7 @@ def train_fm(is_gpu_run=False):
     # Save model + hyperparamers to file
     print("Final train loss = {0:.2f}".format(train_loss))
     print("Final validation loss = {0:.2f}".format(val_loss))
-    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
+    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time, train_loss, val_loss)
 
     # Plot learning curves
     # to check how well model is training (e.g. is there overfitting)
@@ -434,14 +434,14 @@ def train_roi(is_gpu_run=False):
     # Split data
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
-    # TODO: preprocess the data
-    x_train_pre = x_train
-    x_val_pre = x_val
-    x_test_pre = x_test
+    # Preprocess the data
+    train_prep = TorchPreprocessor(x_train,-1,1)
+    x_train_pre = train_prep.apply(x_train)
+    x_val_pre = train_prep.apply(x_val)
+    x_test_pre = train_prep.apply(x_test)
 
     resampler = ROIResampler(x_train,y_train,6)
     x_train_res, y_train_res = resampler.resample()
-
 
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
@@ -451,8 +451,8 @@ def train_roi(is_gpu_run=False):
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
               # ReluLayer(name="relu"),
               # DropoutLayer(name="dropout", p=0.5),
-              LinearLayer(name="linear", in_dim=64, out_dim=4),
-              SoftmaxLayer(name="softmax")]
+              LinearLayer(name="linear", in_dim=64, out_dim=4)]
+              # SoftmaxLayer(name="softmax")]
 
     network = SequentialNet(layers, device)
     print("Network instatiated:")
@@ -460,7 +460,7 @@ def train_roi(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 1000,
+                    'nb_epoch': 100,
                     'learning_rate': 0.005,
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
@@ -520,7 +520,7 @@ def train_roi(is_gpu_run=False):
 
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time)
+    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time, train_loss, val_loss)
 
 
 def optimise_fm():
