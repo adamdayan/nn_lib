@@ -4,6 +4,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
+from imblearn.over_sampling import SMOTE, RandomOverSampler
 
 
 class DataStats(object):
@@ -89,35 +90,84 @@ class TorchPreprocessor(object):
         self.lower = lower_bound
         self.upper = upper_bound
 
-    def normalise(self, x):
+    def apply(self, x):
         return self.lower + (((x - self.min_x) * (self.upper - self.lower)) / (self.max_x - self.min_x))
 
-    def denormalise(self, x):
+    def revert(self, x):
         return self.min_x + (((x - self.lower) * (self.max_x - self.min_x)) / (self.upper - self.lower))
+    
 
-    def apply(self, data):
-        """
-        Apply thmber of training epoche pre-processing operations to the provided dataset.
+class ROIResampler():
 
-        Arguments:
-            - data {np.ndarray} dataset to be normalized.
+    def __init__(self, x_data, y_data, majority_idx, create_synthetic = False):
+        self.x_data = x_data
+        self.y_data = y_data
+        self.full_data = np.concatenate((self.x_data,self.y_data), axis=1)
 
-        Returns:
-            {np.ndarray} normalized dataset.
-        """
-        return self.normalise(data)
+        if create_synthetic == True:
+            self.majority_idx = majority_idx
+            self.majority_data = self.full_data[self.full_data[:,self.majority_idx]==1,:]
+            self.resampling_data = self.full_data[self.full_data[:,self.majority_idx]!=1,:]
 
-    def revert(self, data):
-        """
-        Revert the pre-processing operations to retreive the original dataset.
+        else:
+            self.resampling_data = self.full_data
 
-        Arguments:
-            - data {np.ndarray} dataset for which to revert normalization.
+        self.x_train = self.resampling_data[:,:3]
+        self.y_train = self.resampling_data[:,3:]
 
-        Returns:
-            {np.ndarray} reverted dataset.
-        """
-        return self.denormalise(data)
+    def resample(self):
+        y_consolidated = np.argmax(self.y_train,axis=1)
+        sm = SMOTE(random_state=2)
+        ros = RandomOverSampler(random_state=42)
+        X_train_res, y_train_res = ros.fit_sample(self.x_train,y_consolidated.ravel())
+
+        x_final_training = np.asarray(X_train_res)
+        y_final_training = np.asarray(y_train_res)
+
+        b = np.zeros((y_final_training.shape[0],4))
+        b[np.arange(y_final_training.shape[0]), y_final_training] = 1
+        y_final_training = b
+
+        print(x_final_training.shape)
+        print(y_final_training.shape)
+
+        return x_final_training, y_final_training
+
+
+def split_train_val_test(dataset, last_feature_idx):
+
+    np.random.shuffle(dataset)
+    x = dataset[:, :(last_feature_idx + 1)]
+    y = dataset[:, (last_feature_idx + 1):]
+
+    # TODO: CHECK THE SPLIT THOROUGLY
+    # Split the dataset into train, val, test
+    train_idx = int(0.8 * len(x))
+
+    x_train = x[:train_idx]
+    y_train = y[:train_idx]
+
+    # Remainder should be split
+    x_rem = x[train_idx:]
+    y_rem = y[train_idx:]
+
+    val_idx = int(0.5 * len(x_rem))
+
+    x_val = x_rem[:val_idx]
+    y_val = y_rem[:val_idx]
+
+    x_test = x_rem[val_idx:]
+    y_test = y_rem[val_idx:]
+
+    print("Input data split into train, val, test with shapes:")
+    print("- x_train = " + str(x_train.shape))
+    print("- y_train = " + str(y_train.shape))
+    print("- x_val = " + str(x_val.shape))
+    print("- y_val = " + str(y_val.shape))
+    print("- x_test = " + str(x_test.shape))
+    print("- y_test = " + str(y_test.shape))
+
+    return x_train, y_train, x_val, y_val, x_test, y_test
 
 
 if __name__ == "__main__":    
@@ -129,12 +179,4 @@ if __name__ == "__main__":
     print("Plotting stats for ROI_dataset.dat")
     data_roi = np.loadtxt("ROI_dataset.dat")
     torch_pp_fm = DataStats(data_roi, split_idx=2, dataset_name="ROI", problem_type="regression")
-
-    # torch_pp = TorchPreprocessor(data_roi, -1, 1)
-    # norm_data = torch_pp.apply(data_roi)
-    # rev_data = torch_pp.revert(norm_data)
-    # print(np.array_equal(data_roi, rev_data))
-    # print(np.sum(data_roi))
-    # print("break")
-    # print(np.sum(rev_data))
 

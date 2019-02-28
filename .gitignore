@@ -1,6 +1,8 @@
 *__pycache__*
 venv_azure/
 output/
+!output/learn_fm/best_model/
+!output/learn_roi/best_model/
 .idea/
 nnprof.profile
 scikit_opt/

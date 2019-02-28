@@ -12,12 +12,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
 
-from pytorch_pp import TorchPreprocessor
+from pytorch_pp import *
 from sklearn.metrics import confusion_matrix
 from torch_utils import *
 from evaluation_utils import *
-
-from imblearn.over_sampling import SMOTE, RandomOverSampler
 
 class SequentialNet(nn.Module):
 
@@ -237,10 +235,10 @@ class TorchTrainer():
             #build network
             layers = [LinearLayer(name="linear", in_dim=3, out_dim=hidden_layer_neurons),
                       # LinearLayer(name="linear", in_dim=8, out_dim=8),
-                      ReluLayer(name="tanh"),
+                      TanhLayer(name="tanh"),
                       # DropoutLayer(name="dropout", p=0.2),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=hidden_layer_neurons),
-                      ReluLayer(name="tanh"),
+                      TanhLayer(name="tanh"),
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=3)]
             
@@ -326,42 +324,6 @@ class TorchTrainer():
             return loss.item()
 
 
-def split_train_val_test(dataset, last_feature_idx):
-
-    np.random.shuffle(dataset)
-    x = dataset[:, :(last_feature_idx + 1)]
-    y = dataset[:, (last_feature_idx + 1):]
-
-    # TODO: CHECK THE SPLIT THOROUGLY
-    # Split the dataset into train, val, test
-    train_idx = int(0.8 * len(x))
-
-    x_train = x[:train_idx]
-    y_train = y[:train_idx]
-
-    # Remainder should be split
-    x_rem = x[train_idx:]
-    y_rem = y[train_idx:]
-
-    val_idx = int(0.5 * len(x_rem))
-
-    x_val = x_rem[:val_idx]
-    y_val = y_rem[:val_idx]
-
-    x_test = x_rem[val_idx:]
-    y_test = y_rem[val_idx:]
-
-    print("Input data split into train, val, test with shapes:")
-    print("- x_train = " + str(x_train.shape))
-    print("- y_train = " + str(y_train.shape))
-    print("- x_val = " + str(x_val.shape))
-    print("- y_val = " + str(y_val.shape))
-    print("- x_test = " + str(x_test.shape))
-    print("- y_test = " + str(y_test.shape))
-
-    return x_train, y_train, x_val, y_val, x_test, y_test
-
-
 def train_fm(is_gpu_run=False):
 
     # Device configuration
@@ -376,12 +338,18 @@ def train_fm(is_gpu_run=False):
     # Split data
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
-    # TODO: preprocess the data
-    train_prep = TorchPreprocessor(x_train,-1,1)
-    x_train_pre = train_prep.apply(x_train)
-    x_val_pre = train_prep.apply(x_val)
-    x_test_pre = train_prep.apply(x_test)
+    # Preprocess the features
+    x_preproc = TorchPreprocessor(x_train,-1,1)
+    x_train_pre = x_preproc.apply(x_train)
+    x_val_pre = x_preproc.apply(x_val)
+    x_test_pre = x_preproc.apply(x_test)
 
+    # Also preprocess the targets for regression
+    y_preproc = TorchPreprocessor(y_train, -1, 1)
+    y_train_pre = y_preproc.apply(y_train)
+    y_val_pre = y_preproc.apply(y_val)
+    y_test_pre = y_preproc.apply(y_test)
+    
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
@@ -401,7 +369,7 @@ def train_fm(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 500,
+                    'nb_epoch': 100,
                     'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
@@ -420,17 +388,28 @@ def train_fm(is_gpu_run=False):
         log_output_path=output_path
     )
 
-    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
+    trainer.train(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
 
     # Evaluate results
-    train_loss=trainer.eval_loss(x_train_pre, y_train)
-    val_loss=trainer.eval_loss(x_val_pre, y_val)
-    test_loss=trainer.eval_loss(x_test_pre, y_test)
+    train_loss=trainer.eval_loss(x_train_pre, y_train_pre)
+    val_loss=trainer.eval_loss(x_val_pre, y_val_pre)
+    test_loss=trainer.eval_loss(x_test_pre, y_test_pre)
 
     # Save model + hyperparamers to file
-    print("Final train loss = {0:.2f}".format(train_loss))
-    print("Final validation loss = {0:.2f}".format(val_loss))
-    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, test_loss)
+    print("Final train loss = {0:.8f}".format(train_loss))
+    print("Final validation loss = {0:.8f}".format(val_loss))
+    print("Final test loss = {0:.8f}".format(test_loss))
+    
+    save_training_output(network,
+                         layers,
+                         x_preproc,
+                         hyper_params,
+                         output_path,
+                         readable_time,
+                         train_loss,
+                         val_loss,
+			 test_loss,
+                         y_preprocessor=y_preproc)
 
     # Plot learning curves
     # to check how well model is training (e.g. is there overfitting)
@@ -456,43 +435,6 @@ def train_fm(is_gpu_run=False):
     plt.savefig(output_path + "/" + hyper_params['loss_fun'] + "_loss_plot.png")
 
 
-class ROIResampler():
-
-    def __init__(self, x_data, y_data, majority_idx, create_synthetic = False):
-        self.x_data = x_data
-        self.y_data = y_data
-        self.full_data = np.concatenate((self.x_data,self.y_data), axis=1)
-
-        if create_synthetic == True:
-            self.majority_idx = majority_idx
-            self.majority_data = self.full_data[self.full_data[:,self.majority_idx]==1,:]
-            self.resampling_data = self.full_data[self.full_data[:,self.majority_idx]!=1,:]
-
-        else:
-            self.resampling_data = self.full_data
-
-        self.x_train = self.resampling_data[:,:3]
-        self.y_train = self.resampling_data[:,3:]
-
-    def resample(self):
-        y_consolidated = np.argmax(self.y_train,axis=1)
-        sm = SMOTE(random_state=2)
-        ros = RandomOverSampler(random_state=42)
-        X_train_res, y_train_res = ros.fit_sample(self.x_train,y_consolidated.ravel())
-
-        x_final_training = np.asarray(X_train_res)
-        y_final_training = np.asarray(y_train_res)
-
-        b = np.zeros((y_final_training.shape[0],4))
-        b[np.arange(y_final_training.shape[0]), y_final_training] = 1
-        y_final_training = b
-
-        print(x_final_training.shape)
-        print(y_final_training.shape)
-
-        return x_final_training, y_final_training
-
-# TODO: could abstract this further to reduce code repetition
 def train_roi(is_gpu_run=False):
 
     # Device configuration
@@ -560,8 +502,9 @@ def train_roi(is_gpu_run=False):
     test_loss=trainer.eval_loss(x_test_pre, y_test)
 
     # Evaluate results
-    print("Final train loss = {0:.2f}".format(train_loss))
-    print("Final validation loss = {0:.2f}".format(val_loss))
+    print("Final train loss = {0:.8f}".format(train_loss))
+    print("Final validation loss = {0:.8f}".format(val_loss))
+    print("Final test loss = {0:.8f}".format(test_loss))	
 
     train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
     train_targ = y_train_res.argmax(axis=1).squeeze()
@@ -593,7 +536,7 @@ def train_roi(is_gpu_run=False):
 
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time
+    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time
                          , train_loss, val_loss, test_loss)
 
 
@@ -607,17 +550,24 @@ def optimise_fm():
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
     # TODO: preprocess the data
-    train_prep = TorchPreprocessor(x_train,-1,1)
-    x_train_pre = train_prep.apply(x_train)
-    x_val_pre = train_prep.apply(x_val)
-    x_test_pre = train_prep.apply(x_test)
+    # Preprocess the features
+    x_preproc = TorchPreprocessor(x_train,-1,1)
+    x_train_pre = x_preproc.apply(x_train)
+    x_val_pre = x_preproc.apply(x_val)
+    x_test_pre = x_preproc.apply(x_test)
+
+    # Also preprocess the targets for regression
+    y_preproc = TorchPreprocessor(y_train, -1, 1)
+    y_train_pre = y_preproc.apply(y_train)
+    y_val_pre = y_preproc.apply(y_val)
+    y_test_pre = y_preproc.apply(y_test)
 
     network = SequentialNet([LinearLayer(name="linear", in_dim=3, out_dim=32)])
     trainer = TorchTrainer(
         problem_type="regression",
         network=network,
         batch_size=10,
-        nb_epoch=1000,
+        nb_epoch=100,
         learning_rate=0.01,
         loss_fun="mse",
         shuffle_flag=True,
@@ -627,18 +577,18 @@ def optimise_fm():
         optimise_flag=True
     )
 
-    trainer.set_optimisation(x_train_pre, y_train, x_val_pre, y_val)
+    trainer.set_optimisation(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
     
     optimisation_parameters = [
         (10,200),
         (0.0005, 0.2),
-        (40,200)        
+        (10,200)        
     ]
 
     result = gp_minimize(trainer.optimise_hyperparameters,
                          optimisation_parameters,
                          acq_func="EI",
-                         n_calls=30,
+                         n_calls=5,
                          n_random_starts=5,
                          noise=0.1**2,
                          random_state=123
@@ -655,11 +605,11 @@ def optimise_fm():
     # Instatiate a network    
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=optimal_parameters_list[2]),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
-              ReluLayer(name="tanh"),
+              ReluLayer(name="relu"),
               # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=optimal_parameters_list[2], out_dim=optimal_parameters_list[2]),
 
-              ReluLayer(name="tanh"),
+              ReluLayer(name="relu"),
               # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=optimal_parameters_list[2], out_dim=3),
               #SoftmaxLayer(name="softmax")
@@ -690,19 +640,28 @@ def optimise_fm():
         log_output_path=output_path
     )
 
-    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
-
-    train_loss = trainer.eval_loss(x_train_pre, y_train)
-    val_loss = trainer.eval_loss(x_val_pre, y_val)
-    test_loss = trainer.eval_loss(x_test_pre, y_test)
+    trainer.train(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
     
     # Evaluate results
+    train_loss = trainer.eval_loss(x_train_pre, y_train_pre)
+    val_loss = trainer.eval_loss(x_val_pre, y_val_pre)
+    test_loss = trainer.eval_loss(x_test_pre, y_test_pre)
+
     print("Optimised train loss = {0:.2f}".format(train_loss))
     print("Optimised validation loss = {0:.2f}".format(val_loss))
     print("Optimised test loss = {0:.2f}".format(test_loss))
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, test_loss)
+    save_training_output(network,
+                         layers,
+                         x_preproc,
+                         hyper_params,
+                         output_path,
+                         readable_time,
+                         train_loss,
+                         val_loss,
+			 test_loss,
+                         y_preprocessor=y_preproc)
 
 
 def optimise_roi():
@@ -746,7 +705,7 @@ def optimise_roi():
     result = gp_minimize(trainer.optimise_hyperparameters,
                          optimisation_parameters,
                          acq_func="EI",
-                         n_calls=30,
+                         n_calls=5,
                          n_random_starts=5,
                          noise=0.1**2,
                          random_state=123
@@ -803,12 +762,12 @@ def optimise_roi():
     test_loss = trainer.eval_loss(x_test_pre, y_test)
     
     # Evaluate results
-    print("Optimised train loss = {0:.2f}".format(train_loss))
-    print("Optimised validation loss = {0:.2f}".format(val_loss))
-    print("Optimised test loss = {0:.2f}".format(test_loss))
+    print("Optimised train loss = {0:.8f}".format(train_loss))
+    print("Optimised validation loss = {0:.8f}".format(val_loss))
+    print("Optimised test loss = {0:.8f}".format(test_loss))
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, test_loss)
+    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time, train_loss, val_loss, test_loss)
 
 
 if __name__ == "__main__":
