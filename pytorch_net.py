@@ -4,6 +4,7 @@ import getopt
 
 from logger import Logger
 import numpy as np
+from skopt import gp_minimize
 
 import torch
 import torch.nn as nn
@@ -65,7 +66,8 @@ class TorchTrainer():
                  shuffle_flag,
                  optimizer,
                  device,
-                 log_output_path=''):
+                 log_output_path='',
+                 optimise_flag=False):
 
         self.problem_type = problem_type
         self.network = network.to(device)
@@ -76,7 +78,8 @@ class TorchTrainer():
         self.shuffle_flag = shuffle_flag
         self.device = device
         self.log_output_path = log_output_path + '/logs'
-        self.logger = Logger(self.log_output_path)
+        if not optimise_flag:
+            self.logger = Logger(self.log_output_path)
 
         if self.loss_fun == "mse":
             self.loss_criterion = nn.MSELoss()
@@ -112,10 +115,12 @@ class TorchTrainer():
         shuffled_idxs = np.random.permutation(input_dataset.shape[0])
         return input_dataset[shuffled_idxs], target_dataset[shuffled_idxs]
 
-    def minibatch_data(self, input_dataset, target_dataset):
+    def minibatch_data(self, input_dataset, target_dataset, batch_size=None):
+        if batch_size == None:
+            batch_size = self.batch_size
         assert input_dataset.shape[0] == target_dataset.shape[0], "input and target dataset do not have same number of datapoints!"
 
-        cut_points = np.arange(self.batch_size, input_dataset.shape[0], self.batch_size)
+        cut_points = np.arange(batch_size, input_dataset.shape[0], batch_size)
         return np.split(input_dataset, cut_points), np.split(target_dataset, cut_points)
 
     def train(self, input_dataset, target_dataset, input_dataset_val, target_dataset_val):
@@ -155,6 +160,7 @@ class TorchTrainer():
                     # https://discuss.pytorch.org/t/loss-functions-for-batches/20488
                     batch_target = torch.from_numpy(batched_target[idx]).type(torch.long)
                     batch_target = batch_target.argmax(1)
+                    
                 batch_target = batch_target.to(self.device)
                 batch_loss = self.loss_criterion(batch_output, batch_target)
 
@@ -210,6 +216,88 @@ class TorchTrainer():
                         print("Validation accuracy = {0:.2%}".format(validation_accuracy))
 
 
+    def set_optimisation(self, x_train, y_train, x_val, y_val):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.x_val = x_val
+        self.y_val = y_val
+                        
+    def optimise_hyperparameters(self, params):
+        #extract params from input array
+        batch_size = params[0]
+        learning_rate = params[1]
+
+        input_dataset = self.x_train
+        target_dataset = self.y_train
+        input_dataset_val = self.x_val
+        target_dataset_val = self.y_val
+        hidden_layer_neurons = params[2]
+
+        if self.problem_type == "regression":
+            #build network
+            layers = [LinearLayer(name="linear", in_dim=3, out_dim=hidden_layer_neurons),
+                      # LinearLayer(name="linear", in_dim=8, out_dim=8),
+                      ReluLayer(name="relu"),
+                      # DropoutLayer(name="dropout", p=0.2),
+                      LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=hidden_layer_neurons),
+                      ReluLayer(name="relu"),
+                      # DropoutLayer(name="dropout", p=0.5),
+                      LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=3)]
+            
+        elif self.problem_type == "classification":
+            layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
+                      # LinearLayer(name="linear", in_dim=8, out_dim=8),
+                      ReluLayer(name="relu"),
+                      # DropoutLayer(name="dropout", p=0.5),
+                      # LinearLayer(name="linear", in_dim=8, out_dim=8),
+                      # ReluLayer(name="relu"),
+                      # DropoutLayer(name="dropout", p=0.5),
+                      LinearLayer(name="linear", in_dim=64, out_dim=4),
+                      SoftmaxLayer(name="softmax")]
+            
+        network = SequentialNet(layers, self.device)
+        optimiser = optim.Adam(network.parameters(), lr=learning_rate)
+
+        #split data
+        input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
+        batched_input, batched_target = self.minibatch_data(input_dataset, target_dataset, batch_size)
+
+        #train model 
+        for epoch in range(1, self.nb_epoch + 1):
+            network.train()
+
+            for batch_input, batch_target in zip(batched_input, batched_target):
+                batch_output = network.forward(batch_input)
+
+                if self.problem_type == "regression":
+                    cur_batch_target = torch.from_numpy(batch_target).float()
+                elif self.problem_type == "classification":
+                    cur_batch_target = torch.from_numpy(batch_target).type(torch.long)
+                    cur_batch_target = cur_batch_target.argmax(1)
+
+                batch_loss = self.loss_criterion(batch_output, cur_batch_target)
+
+                network.zero_grad()
+                batch_loss.backward()
+                optimiser.step()
+
+        #evaluate model on val data
+        with torch.no_grad():
+            output_tensor = network.forward(input_dataset_val)
+
+            if self.problem_type == "regression":
+                target_tensor = torch.from_numpy(target_dataset_val).float()
+            elif self.problem_type == "classification":
+                target_tensor = torch.from_numpy(target_dataset_val).type(torch.long)
+
+                target_tensor = target_tensor.argmax(1)
+
+            validation_loss = self.loss_criterion(output_tensor, target_tensor)
+            
+            return validation_loss.item()
+                
+        
+
     def eval_loss(self, input_dataset, target_dataset):
         """
         Calculates loss from the network
@@ -261,7 +349,7 @@ def split_train_val_test(dataset, last_feature_idx):
     y_val = y_rem[:val_idx]
 
     x_test = x_rem[val_idx:]
-    y_test = x_rem[val_idx:]
+    y_test = y_rem[val_idx:]
 
     print("Input data split into train, val, test with shapes:")
     print("- x_train = " + str(x_train.shape))
@@ -313,7 +401,7 @@ def train_fm(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 100,
+                    'nb_epoch': 1000,
                     'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
@@ -445,7 +533,7 @@ def train_roi(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 10,
+                    'nb_epoch': 1000,
                     'learning_rate': 0.005,
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
@@ -505,7 +593,210 @@ def train_roi(is_gpu_run=False):
 
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, Train_confusion, Val_confusion)
+    save_training_output(network, layers, hyper_params, output_path, readable_time)
+
+
+def optimise_fm():
+    device = "cpu"
+    
+    # Load and prepare data 
+    dataset = np.loadtxt("FM_dataset.dat")
+
+    # Split data
+    x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
+
+    # TODO: preprocess the data
+    x_train_pre = x_train
+    x_val_pre = x_val
+    x_test_pre = x_test
+
+    network = SequentialNet([LinearLayer(name="linear", in_dim=3, out_dim=32)])
+    trainer = TorchTrainer(
+        problem_type="regression",
+        network=network,
+        batch_size=10,
+        nb_epoch=1000,
+        learning_rate=0.01,
+        loss_fun="mse",
+        shuffle_flag=True,
+        optimizer="adam",
+        device="cpu",
+        log_output_path="",
+        optimise_flag=True
+    )
+
+    trainer.set_optimisation(x_train_pre, y_train, x_val_pre, y_val)
+    
+    optimisation_parameters = [
+        (10,200),
+
+        (0.0005, 0.2),
+        (10,200)        
+    ]
+
+    result = gp_minimize(trainer.optimise_hyperparameters,
+                         optimisation_parameters,
+                         acq_func="EI",
+                         n_calls=500,
+                         n_random_starts=5,
+                         noise=0.1**2,
+                         random_state=123
+                         )
+
+    #from skopt.plots import plot_convergence
+
+    #plot_convergence(result)
+
+    print("Training model on optimal parameters")
+    optimal_parameters_list = result.get("x")
+    output_path, readable_time = create_output_folder("best_fm")
+
+    # Instatiate a network    
+    layers = [LinearLayer(name="linear", in_dim=3, out_dim=optimal_parameters_list[2]),
+              # LinearLayer(name="linear", in_dim=8, out_dim=8),
+              ReluLayer(name="relu"),
+              # DropoutLayer(name="dropout", p=0.5),
+              LinearLayer(name="linear", in_dim=optimal_parameters_list[2], out_dim=optimal_parameters_list[2]),
+
+              ReluLayer(name="relu"),
+              # DropoutLayer(name="dropout", p=0.5),
+              LinearLayer(name="linear", in_dim=optimal_parameters_list[2], out_dim=3),
+              #SoftmaxLayer(name="softmax")
+    ]
+
+    network = SequentialNet(layers, device)
+    print("Optimised Network instatiated:")
+    print(network)
+
+    # Add the network to a trainer and train
+    hyper_params = {'batch_size': optimal_parameters_list[0],
+                    'nb_epoch': 1000,
+                    'learning_rate': optimal_parameters_list[1],
+                    'loss_fun': "mse",
+                    'shuffle_flag': True,
+                    'optimizer': "adam"}
+    
+    trainer = TorchTrainer(
+        problem_type="regression",
+        network=network,
+        batch_size=hyper_params['batch_size'],
+        nb_epoch=hyper_params['nb_epoch'],
+        learning_rate=hyper_params['learning_rate'],
+        loss_fun=hyper_params['loss_fun'],
+        shuffle_flag=hyper_params['shuffle_flag'],
+        optimizer=hyper_params['optimizer'],
+        device=device,
+        log_output_path=output_path
+    )
+
+    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
+    
+    # Evaluate results
+    print("Optimised train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
+    print("Optimised validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+
+    # Save model + hyperparamers to file
+    save_training_output(network, layers, hyper_params, output_path, readable_time)
+
+
+def optimise_roi():
+    device = "cpu"
+    
+    # Load and prepare data 
+    dataset = np.loadtxt("ROI_dataset.dat")
+
+    # Split data
+    x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
+
+    # TODO: preprocess the data
+    x_train_pre = x_train
+    x_val_pre = x_val
+    x_test_pre = x_test
+
+    network = SequentialNet([LinearLayer(name="linear", in_dim=3, out_dim=32)])
+    trainer = TorchTrainer(
+        problem_type="classification",
+        network=network,
+        batch_size=10,
+        nb_epoch=100,
+        learning_rate=0.01,
+        loss_fun="cross_entropy",
+        shuffle_flag=True,
+        optimizer="adam",
+        device="cpu",
+        log_output_path="",
+        optimise_flag=True
+    )
+
+    trainer.set_optimisation(x_train_pre, y_train, x_val_pre, y_val)
+    
+    optimisation_parameters = [
+        (10,200),
+        (0.001, 0.2),
+        (10,100)        
+    ]
+
+    result = gp_minimize(trainer.optimise_hyperparameters,
+                         optimisation_parameters,
+                         acq_func="EI",
+                         n_calls=30,
+                         n_random_starts=5,
+                         noise=0.1**2,
+                         random_state=123
+                         )
+
+    #from skopt.plots import plot_convergence
+
+    #plot_convergence(result)
+
+    print("Training model on optimal parameters")
+    optimal_parameters_list = result.get("x")
+    output_path, readable_time = create_output_folder("best_roi")
+
+    # Instatiate a network
+    layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
+              # LinearLayer(name="linear", in_dim=8, out_dim=8),
+              ReluLayer(name="relu"),
+              # DropoutLayer(name="dropout", p=0.5),
+              # LinearLayer(name="linear", in_dim=8, out_dim=8),
+              # ReluLayer(name="relu"),
+              # DropoutLayer(name="dropout", p=0.5),
+              LinearLayer(name="linear", in_dim=64, out_dim=4),
+              SoftmaxLayer(name="softmax")]
+
+    network = SequentialNet(layers, device)
+    print("Optimised Network instantiated:")
+    print(network)
+
+    # Add the network to a trainer and train
+    hyper_params = {'batch_size': optimal_parameters_list[0],
+                    'nb_epoch': 1000,
+                    'learning_rate': optimal_parameters_list[1],
+                    'loss_fun': "cross_entropy",
+                    'shuffle_flag': True,
+                    'optimizer': "adam"}
+    
+    trainer = TorchTrainer(
+        problem_type="classification",
+        network=network,
+        batch_size=hyper_params['batch_size'],
+        nb_epoch=hyper_params['nb_epoch'],
+        learning_rate=hyper_params['learning_rate'],
+        loss_fun=hyper_params['loss_fun'],
+        shuffle_flag=hyper_params['shuffle_flag'],
+        optimizer=hyper_params['optimizer'],
+        device=device,
+        log_output_path=output_path
+    )
+    
+    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
+
+    # Evaluate results
+    print("Optimised train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
+    print("Optimised validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+
+    # Save model + hyperparamers to file
+    save_training_output(network, layers, hyper_params, output_path, readable_time)
 
 
 if __name__ == "__main__":
@@ -534,5 +825,9 @@ if __name__ == "__main__":
         train_fm(is_gpu_run=False)
     elif model == "learn_roi":
         train_roi(is_gpu_run=False)
+    elif model == "optimise_fm":
+        optimise_fm()
+    elif model == "optimise_roi":
+        optimise_roi()
     else:
         raise ValueError("Not a valid model " + str(model))
