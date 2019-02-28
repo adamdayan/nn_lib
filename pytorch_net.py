@@ -13,11 +13,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
 from pytorch_pp import TorchPreprocessor
+from sklearn.metrics import confusion_matrix
 from torch_utils import *
+from evaluation_utils import *
 
-    
+from imblearn.over_sampling import SMOTE, RandomOverSampler
 
 
 class SequentialNet(nn.Module):
@@ -381,7 +382,8 @@ def create_output_folder(run_type):
     return output_path, readable_time
 
 
-def save_training_output(network, layers, hyper_params, output_path, readable_time):
+
+def save_training_output(network, layers, hyper_params, output_path, readable_time,train_loss,val_loss, train_conf = None, val_conf = None):
     """
     Saves training output to file
     """
@@ -392,13 +394,23 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
     # Save hyperparameters to log file
     parameter_out_file = output_path + "/parameters.txt"
     with open(parameter_out_file, 'w') as f:
-        f.write("------ LOG FILE ------\n")
-        f.write("Model ran at " + str(readable_time) + "\n\n")
+        #f.write("------ LOG FILE ------\n")
+        #f.write("Model ran at " + str(readable_time) + "\n\n")
 
         f.write("Hyperparameters:\n")
 
         for key, value in hyper_params.items():
             f.write(key + " = " + str(value) + "\n")
+
+        f.write("\n")
+        if train_conf != None:
+            for key, value in train_conf.items():
+                f.write(key + " = " + str(value) + "\n")
+            f.write("\n")
+            for key, value in val_conf.items():
+                f.write(key + " = " + str(value) + "\n")
+            f.write("\n")
+            """"
         f.write("\n\nLayers:\n")
         for layer in layers:
             if layer.name == "linear":
@@ -406,7 +418,10 @@ def save_training_output(network, layers, hyper_params, output_path, readable_ti
             if layer.name == "relu":
                 f.write(layer.name + "\n")
             if layer.name == "dropout":
-                f.write(layer.name + "(p=" + str(layer.p) + ")\n")
+                f.write(layer.name + "(p=" + str(layer.p) +)
+                """
+        f.write("Training Loss: " + str(train_loss)+"\n")
+        f.write("Validation Loss: " + str(val_loss))
 
     f.close()
         
@@ -450,9 +465,10 @@ def train_fm(is_gpu_run=False):
     print(network)
 
     # Add the network to a trainer and train
-    hyper_params = {'batch_size': 149,
-                    'nb_epoch': 1000,
-                    'learning_rate': 0.097,
+
+    hyper_params = {'batch_size': 32,
+                    'nb_epoch': 10,
+                    'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
@@ -473,11 +489,53 @@ def train_fm(is_gpu_run=False):
     trainer.train(x_train_pre, y_train, x_val_pre, y_val)
 
     # Evaluate results
-    print("Final train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
-    print("Final validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+    train_loss=trainer.eval_loss(x_train_pre, y_train)
+    val_loss=trainer.eval_loss(x_val_pre, y_val)
+
+
+    print("Final train loss = {0:.2f}".format(train_loss))
+    print("Final validation loss = {0:.2f}".format(val_loss))
+    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss)
+
+        #confusion matrix
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time)
+
+class ROIResampler():
+
+    def __init__(self, x_data, y_data, majority_idx, create_synthetic = False):
+        self.x_data = x_data
+        self.y_data = y_data
+        self.full_data = np.concatenate((self.x_data,self.y_data), axis=1)
+
+        if create_synthetic == True:
+            self.majority_idx = majority_idx
+            self.majority_data = self.full_data[self.full_data[:,self.majority_idx]==1,:]
+            self.resampling_data = self.full_data[self.full_data[:,self.majority_idx]!=1,:]
+
+        else:
+            self.resampling_data = self.full_data
+
+        self.x_train = self.resampling_data[:,:3]
+        self.y_train = self.resampling_data[:,3:]
+
+    def resample(self):
+        y_consolidated = np.argmax(self.y_train,axis=1)
+        sm = SMOTE(random_state=2)
+        ros = RandomOverSampler(random_state=42)
+        X_train_res, y_train_res = ros.fit_sample(self.x_train,y_consolidated.ravel())
+
+        x_final_training = np.asarray(X_train_res)
+        y_final_training = np.asarray(y_train_res)
+
+        b = np.zeros((y_final_training.shape[0],4))
+        b[np.arange(y_final_training.shape[0]), y_final_training] = 1
+        y_final_training = b
+
+        print(x_final_training.shape)
+        print(y_final_training.shape)
+
+        return x_final_training, y_final_training
 
 # TODO: could abstract this further to reduce code repetition
 def train_roi(is_gpu_run=False):
@@ -485,6 +543,7 @@ def train_roi(is_gpu_run=False):
     # Device configuration
     device = torch.device('cuda' if is_gpu_run else 'cpu')
     print("Running on device " + str(device))
+
 
     # Create an output folder for results of this run
     output_path, readable_time = create_output_folder("learn_roi")
@@ -499,6 +558,10 @@ def train_roi(is_gpu_run=False):
     x_train_pre = x_train
     x_val_pre = x_val
     x_test_pre = x_test
+
+    resampler = ROIResampler(x_train,y_train,6)
+    x_train_res, y_train_res = resampler.resample()
+
 
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
@@ -517,7 +580,7 @@ def train_roi(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 1000,
+                    'nb_epoch': 10,
                     'learning_rate': 0.005,
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
@@ -536,14 +599,49 @@ def train_roi(is_gpu_run=False):
         log_output_path=output_path
     )
 
-    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
-
+    trainer.train(x_train_res, y_train_res, x_val_pre, y_val)
+    train_loss=trainer.eval_loss(x_train_res, y_train_res)
+    val_loss=trainer.eval_loss(x_val_pre, y_val)
     # Evaluate results
-    print("Final train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
-    print("Final validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+    print("Final train loss = {0:.2f}".format(train_loss))
+    print("Final validation loss = {0:.2f}".format(val_loss))
+
+    print(network.forward(x_train_res))
+    print((y_train))
+
+    train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
+    train_targ = y_train_res.argmax(axis=1).squeeze()
+   # print(train_preds)
+   # print(train_targ)
+
+    conf_matrix=confusion_matrix(train_targ,train_preds)
+    recall=recall_calculator(conf_matrix)
+    precision=precision_calculator(conf_matrix)
+    f1=f1_score_calculator(precision,recall)
+
+    Train_confusion = {
+    "Train Confusion Matrix" + "\n" : conf_matrix,
+    'Recall': recall,
+    'Precision' : precision,
+    'F1' : f1}
+
+    val_preds = (network.forward(x_val_pre)).detach().numpy().argmax(axis=1).squeeze()
+    val_targ = y_val.argmax(axis=1).squeeze()
+
+    conf_matrix=confusion_matrix(val_targ,val_preds)
+    recall=recall_calculator(conf_matrix)
+    precision=precision_calculator(conf_matrix)
+    f1=f1_score_calculator(precision,recall)
+
+    Val_confusion = {
+    "Val Confusion Matrix" + "\n"  : conf_matrix,
+    'Recall' : recall,
+    'Precision' : precision,
+    'F1' : f1}
+
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time)
+    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, Train_confusion, Val_confusion)
 
 
 def optimise_fm():
