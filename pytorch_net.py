@@ -691,13 +691,18 @@ def optimise_fm():
     )
 
     trainer.train(x_train_pre, y_train, x_val_pre, y_val)
+
+    train_loss = trainer.eval_loss(x_train_pre, y_train)
+    val_loss = trainer.eval_loss(x_val_pre, y_val)
+    test_loss = trainer.eval_loss(x_test_pre, y_test)
     
     # Evaluate results
-    print("Optimised train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
-    print("Optimised validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+    print("Optimised train loss = {0:.2f}".format(train_loss))
+    print("Optimised validation loss = {0:.2f}".format(val_loss))
+    print("Optimised test loss = {0:.2f}".format(test_loss))
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time)
+    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, test_loss)
 
 
 def optimise_roi():
@@ -793,12 +798,17 @@ def optimise_roi():
     
     trainer.train(x_train_pre, y_train, x_val_pre, y_val)
 
+    train_loss = trainer.eval_loss(x_train_pre, y_train)
+    val_loss = trainer.eval_loss(x_val_pre, y_val)
+    test_loss = trainer.eval_loss(x_test_pre, y_test)
+    
     # Evaluate results
-    print("Optimised train loss = {0:.2f}".format(trainer.eval_loss(x_train_pre, y_train)))
-    print("Optimised validation loss = {0:.2f}".format(trainer.eval_loss(x_val_pre, y_val)))
+    print("Optimised train loss = {0:.2f}".format(train_loss))
+    print("Optimised validation loss = {0:.2f}".format(val_loss))
+    print("Optimised test loss = {0:.2f}".format(test_loss))
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, hyper_params, output_path, readable_time)
+    save_training_output(network, layers, hyper_params, output_path, readable_time, train_loss, val_loss, test_loss)
 
 
 if __name__ == "__main__":
