@@ -347,9 +347,9 @@ def train_fm(is_gpu_run=False):
 
     # Also preprocess the targets for regression
     y_preproc = TorchPreprocessor(y_train, -1, 1)
-    y_train_pre = x_preproc.apply(y_train)
-    y_val_pre = x_preproc.apply(y_val)
-    y_test_pre = x_preproc.apply(y_test)
+    y_train_pre = y_preproc.apply(y_train)
+    y_val_pre = y_preproc.apply(y_val)
+    y_test_pre = y_preproc.apply(y_test)
     
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
@@ -370,7 +370,7 @@ def train_fm(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 50,
+                    'nb_epoch': 1000,
                     'learning_rate': 0.005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
