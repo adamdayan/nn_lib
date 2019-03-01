@@ -36,9 +36,10 @@ def predict_hidden(model, hidden_dataset, feature_pp, problem_type="regression",
         else:
             pprint.pprint(preds)
 
-    features = feature_pp.revert(hidden_dataset[:, :3])
-    output = np.hstack((features, preds))
-    np.savetxt(problem_type + ".txt", output)
+    #features = feature_pp.revert(hidden_dataset[:, :3])
+    #output = np.hstack((features, preds))
+    #np.savetxt(problem_type + ".txt", output)
+    return preds
 
 
 def precision_calculator(confusion_matrix):

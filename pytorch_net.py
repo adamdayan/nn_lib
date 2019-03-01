@@ -235,10 +235,10 @@ class TorchTrainer():
             #build network
             layers = [LinearLayer(name="linear", in_dim=3, out_dim=hidden_layer_neurons),
                       # LinearLayer(name="linear", in_dim=8, out_dim=8),
-                      TanhLayer(name="tanh"),
+                      TanhLayer(name="relu"),
                       # DropoutLayer(name="dropout", p=0.2),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=hidden_layer_neurons),
-                      TanhLayer(name="tanh"),
+                      TanhLayer(name="relu"),
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=3)]
             
@@ -570,7 +570,7 @@ def optimise_fm():
         problem_type="regression",
         network=network,
         batch_size=10,
-        nb_epoch=100,
+        nb_epoch=900,
         learning_rate=0.01,
         loss_fun="mse",
         shuffle_flag=True,
@@ -583,7 +583,7 @@ def optimise_fm():
     trainer.set_optimisation(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
     
     optimisation_parameters = [
-        (10,200),
+        (10,250),
         (0.0005, 0.2),
         (10,200)        
     ]
@@ -591,7 +591,7 @@ def optimise_fm():
     result = gp_minimize(trainer.optimise_hyperparameters,
                          optimisation_parameters,
                          acq_func="EI",
-                         n_calls=5,
+                         n_calls=50,
                          n_random_starts=5,
                          noise=0.1**2,
                          random_state=123
@@ -602,6 +602,7 @@ def optimise_fm():
     #plot_convergence(result)
 
     print("Training model on optimal parameters")
+    print(result)
     optimal_parameters_list = result.get("x")
     output_path, readable_time = create_output_folder("best_fm")
 
@@ -687,7 +688,7 @@ def optimise_roi():
         problem_type="classification",
         network=network,
         batch_size=10,
-        nb_epoch=100,
+        nb_epoch=200,
         learning_rate=0.01,
         loss_fun="cross_entropy",
         shuffle_flag=True,
@@ -708,7 +709,7 @@ def optimise_roi():
     result = gp_minimize(trainer.optimise_hyperparameters,
                          optimisation_parameters,
                          acq_func="EI",
-                         n_calls=5,
+                         n_calls=20,
                          n_random_starts=5,
                          noise=0.1**2,
                          random_state=123
