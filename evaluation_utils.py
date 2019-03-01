@@ -20,9 +20,9 @@ def predict_hidden(model, hidden_dataset, feature_pp, problem_type="regression",
 
     if problem_type == "classification":
         preds = softmax(preds)
-        preds = preds.argmax(axis=1) # .squeeze()
+        preds = preds.argmax(axis=1)
+        
         # One-hot encode the output - i.e. force the model to make a decision
-        # TODO: Adam to get this working
         enc = LabelBinarizer()
         preds = enc.fit_transform(preds)
 
@@ -31,16 +31,18 @@ def predict_hidden(model, hidden_dataset, feature_pp, problem_type="regression",
     elif problem_type == "regression":
 
         # If this is a regression task and we normalised the output for training then revert it
-        pprint.pprint(preds)
         if target_pp is not None:
             preds = target_pp.revert(preds)
             pprint.pprint(preds)
         else:
             pprint.pprint(preds)
 
-    #features = feature_pp.revert(hidden_dataset[:, :3])
-    #output = np.hstack((features, preds))
-    #np.savetxt(problem_type + ".txt", output)
+    features = feature_pp.revert(hidden_dataset[:, :3])
+    output = np.hstack((features, preds))
+    np.savetxt(problem_type + ".txt", output)
+
+    print("Output saved to " + problem_type + ".txt")
+    
     return preds
 
 

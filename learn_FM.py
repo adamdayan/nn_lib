@@ -11,10 +11,15 @@ from torch_utils import *
 def main(dataset_filepath):
 
     # Load dataset
+    print("====================================")
+    print("Loading dataset = " + dataset_filepath)
     dataset = np.loadtxt(dataset_filepath)
 
     # Load best model and evaluate
     model_path = "output/learn_fm/best_model/"
+    print("====================================")
+    print("Loading model = " + model_path)
+    print("Model information: ")
     model, x_pp, y_pp = load_torch_model(model_path + "model.pt",
                                          model_path + "layers.pickle",
                                          model_path + "x_preprocessor.pickle",
@@ -25,6 +30,8 @@ def main(dataset_filepath):
     dataset = x_pp.apply(dataset[:, :3])
 
     # Return predictions to user
+    print("====================================")
+    print("Prediction:")
     predict_hidden(model, dataset, x_pp, target_pp=y_pp)
 
     
