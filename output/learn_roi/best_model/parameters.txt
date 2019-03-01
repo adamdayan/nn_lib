@@ -1,6 +1,6 @@
 Hyperparameters:
 batch_size = 32
-nb_epoch = 50
+nb_epoch = 100
 learning_rate = 0.001
 loss_fun = cross_entropy
 shuffle_flag = True
@@ -11,46 +11,46 @@ Layers:
 linear(3, 64)
 relu
 linear(64, 4)
-Train Loss = 0.75938880443573
-Validation Loss = 0.7776956558227539
-Test Loss = 0.780024528503418
-Train Accuracy = 0.9876161755981807
-Validation Accuracy = 0.9660691421254801
-Test Accuracy = 0.9628918746001279
+Train Loss = 0.028830230236053467
+Validation Loss = 0.05955739691853523
+Test Loss = 0.06361059844493866
+Train Accuracy = 0.9926107156979043
+Validation Accuracy = 0.9775928297055058
+Test Accuracy = 0.9782469609724888
 
 Train Confusion Matrix
-[[10114     0     0     0]
- [    0 10071    24    19]
- [    0     0 10114     0]
- [   56   225   177  9656]]
+[[10116     0     0     0]
+ [    0 10029    56    31]
+ [    0     0 10116     0]
+ [    3    94   115  9904]]
 
-Recall0.9876161755981807
+Recall0.9926107156979044
 
-Precision0.987797613085779
+Precision0.9926686348008931
 
-F10.9877068860096593
+F10.9926396744045246
 
 Val Confusion Matrix
-[[ 139    0    0    0]
- [   0  158    1    0]
- [   0    0   13    0]
- [   7   29   16 1199]]
+[[ 116    0    0    0]
+ [   0  144    4    1]
+ [   0    0   22    0]
+ [   0   14   16 1245]]
 
-Recall0.9880359863052954
+Recall0.9857283853138571
 
-Precision0.8075769784875345
+Precision0.858599840163629
 
-F10.888738422034552
+F10.9177826618752913
 
 Test Confusion Matrix
-[[ 152    0    0    0]
- [   0  133    1    0]
- [   0    0    8    0]
- [   9   30   18 1212]]
+[[ 140    0    0    0]
+ [   0  157    0    6]
+ [   0    0   17    0]
+ [   1   12   15 1215]]
 
-Recall0.9869050139374052
+Recall0.985166009407282
 
-Precision0.7640866488559206
+Precision0.8620594698361678
 
-F10.8613187154021803
+F10.9195105820195623
 
