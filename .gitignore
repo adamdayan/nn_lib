@@ -6,3 +6,6 @@ output/learn_roi/2*
 nnprof.profile
 scikit_opt/
 venv_imbalance/
+regression.txt
+classification.txt
+
