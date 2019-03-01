@@ -158,7 +158,7 @@ class TorchTrainer():
                     # https://discuss.pytorch.org/t/loss-functions-for-batches/20488
                     batch_target = torch.from_numpy(batched_target[idx]).type(torch.long)
                     batch_target = batch_target.argmax(1)
-                    
+
                 batch_target = batch_target.to(self.device)
                 batch_loss = self.loss_criterion(batch_output, batch_target)
 
@@ -219,7 +219,7 @@ class TorchTrainer():
         self.y_train = y_train
         self.x_val = x_val
         self.y_val = y_val
-                        
+
     def optimise_hyperparameters(self, params):
         #extract params from input array
         batch_size = params[0]
@@ -241,7 +241,7 @@ class TorchTrainer():
                       ReluLayer(name="relu"),
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=3)]
-            
+
         elif self.problem_type == "classification":
             layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
                       # LinearLayer(name="linear", in_dim=8, out_dim=8),
@@ -252,7 +252,7 @@ class TorchTrainer():
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=64, out_dim=4),
                       SoftmaxLayer(name="softmax")]
-            
+
         network = SequentialNet(layers, self.device)
         optimiser = optim.Adam(network.parameters(), lr=learning_rate)
 
@@ -260,7 +260,7 @@ class TorchTrainer():
         input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
         batched_input, batched_target = self.minibatch_data(input_dataset, target_dataset, batch_size)
 
-        #train model 
+        #train model
         for epoch in range(1, self.nb_epoch + 1):
             network.train()
 
@@ -291,10 +291,10 @@ class TorchTrainer():
                 target_tensor = target_tensor.argmax(1)
 
             validation_loss = self.loss_criterion(output_tensor, target_tensor)
-            
+
             return validation_loss.item()
-                
-        
+
+
 
     def eval_loss(self, input_dataset, target_dataset):
         """
@@ -349,7 +349,7 @@ def train_fm(is_gpu_run=False):
     y_train_pre = y_preproc.apply(y_train)
     y_val_pre = y_preproc.apply(y_val)
     y_test_pre = y_preproc.apply(y_test)
-    
+
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
@@ -394,12 +394,13 @@ def train_fm(is_gpu_run=False):
     train_loss=trainer.eval_loss(x_train_pre, y_train_pre)
     val_loss=trainer.eval_loss(x_val_pre, y_val_pre)
     test_loss=trainer.eval_loss(x_test_pre, y_test_pre)
+    losses={" Train Loss": train_loss, "Validation Loss": val_loss, "Test Loss":test_loss}
 
     # Save model + hyperparamers to file
     print("Final train loss = {0:.8f}".format(train_loss))
     print("Final validation loss = {0:.8f}".format(val_loss))
     print("Final test loss = {0:.8f}".format(test_loss))
-    
+
     save_training_output(network,
                          layers,
                          x_preproc,
@@ -433,6 +434,51 @@ def train_fm(is_gpu_run=False):
     plt.ylabel("Loss (" + hyper_params['loss_fun'] + ")")
 
     plt.savefig(output_path + "/" + hyper_params['loss_fun'] + "_loss_plot.png")
+
+
+def confusion_matrices(train_preds,train_targ,val_preds,val_targ,test_preds,test_targ):
+
+        #Training data confusion matrix
+        conf_matrix=confusion_matrix(train_targ,train_preds)
+        recall=recall_calculator(conf_matrix)
+        precision=precision_calculator(conf_matrix)
+        f1=f1_score_calculator(precision,recall)
+
+        Train_confusion = {
+        "Train Confusion Matrix" + "\n" : conf_matrix,
+        'Recall': recall,
+        'Precision' : precision,
+        'F1' : f1}
+
+
+
+        #Validation data confusion matrix
+        conf_matrix=confusion_matrix(val_targ,val_preds)
+        recall=recall_calculator(conf_matrix)
+        precision=precision_calculator(conf_matrix)
+        f1=f1_score_calculator(precision,recall)
+
+        Val_confusion = {
+        "Val Confusion Matrix" + "\n"  : conf_matrix,
+        'Recall' : recall,
+        'Precision' : precision,
+        'F1' : f1}
+
+        #Test data confusion matrix
+        conf_matrix=confusion_matrix(test_targ,test_preds)
+        recall=recall_calculator(conf_matrix)
+        precision=precision_calculator(conf_matrix)
+        f1=f1_score_calculator(precision,recall)
+
+        Test_confusion = {
+        "Test Confusion Matrix" + "\n"  : conf_matrix,
+        'Recall' : recall,
+        'Precision' : precision,
+        'F1' : f1}
+
+        return Train_confusion, Val_confusion, Test_confusion
+
+
 
 
 def train_roi(is_gpu_run=False):
@@ -500,40 +546,23 @@ def train_roi(is_gpu_run=False):
     train_loss = trainer.eval_loss(x_train_res, y_train_res)
     val_loss = trainer.eval_loss(x_val_pre, y_val)
     test_loss = trainer.eval_loss(x_test_pre, y_test)
+    losses={" Train Loss": train_loss, "Validation Loss": val_loss, "Test Loss":test_loss }
 
     # Evaluate results
     print("Final train loss = {0:.8f}".format(train_loss))
     print("Final validation loss = {0:.8f}".format(val_loss))
-    print("Final test loss = {0:.8f}".format(test_loss))	
+    print("Final test loss = {0:.8f}".format(test_loss))
 
     train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
     train_targ = y_train_res.argmax(axis=1).squeeze()
 
-    conf_matrix=confusion_matrix(train_targ,train_preds)
-    recall=recall_calculator(conf_matrix)
-    precision=precision_calculator(conf_matrix)
-    f1=f1_score_calculator(precision,recall)
-
-    Train_confusion = {
-    "Train Confusion Matrix" + "\n" : conf_matrix,
-    'Recall': recall,
-    'Precision' : precision,
-    'F1' : f1}
-
     val_preds = (network.forward(x_val_pre)).detach().numpy().argmax(axis=1).squeeze()
     val_targ = y_val.argmax(axis=1).squeeze()
 
-    conf_matrix=confusion_matrix(val_targ,val_preds)
-    recall=recall_calculator(conf_matrix)
-    precision=precision_calculator(conf_matrix)
-    f1=f1_score_calculator(precision,recall)
+    test_preds = (network.forward(x_test_pre)).detach().numpy().argmax(axis=1).squeeze()
+    test_targ = y_test.argmax(axis=1).squeeze()
 
-    Val_confusion = {
-    "Val Confusion Matrix" + "\n"  : conf_matrix,
-    'Recall' : recall,
-    'Precision' : precision,
-    'F1' : f1}
-
+    Train_confusion, Val_confusion, Test_confusion = confusion_matrices(train_preds,train_targ,val_preds,val_targ,test_preds,test_targ)
 
     # Save model + hyperparamers to file
     save_training_output(network,
@@ -542,15 +571,17 @@ def train_roi(is_gpu_run=False):
                          hyper_params,
                          output_path,
                          readable_time,
-                         train_loss,
-                         val_loss,
-                         test_loss)
+                         losses,
+                         Train_confusion,
+                         Val_confusion,
+                         Test_confusion)
+
 
 
 def optimise_fm():
     device = "cpu"
-    
-    # Load and prepare data 
+
+    # Load and prepare data
     dataset = np.loadtxt("FM_dataset.dat")
 
     # Split data
@@ -573,7 +604,7 @@ def optimise_fm():
     trainer = TorchTrainer(
         problem_type="regression",
         network=network,
-        batch_size=10,
+        batch_size=1000,
         nb_epoch=900,
         learning_rate=0.01,
         loss_fun="mse",
@@ -585,11 +616,11 @@ def optimise_fm():
     )
 
     trainer.set_optimisation(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
-    
+
     optimisation_parameters = [
         (10,250),
         (0.0005, 0.2),
-        (10,200)        
+        (10,200)
     ]
 
     result = gp_minimize(trainer.optimise_hyperparameters,
@@ -610,7 +641,7 @@ def optimise_fm():
     optimal_parameters_list = result.get("x")
     output_path, readable_time = create_output_folder("best_fm")
 
-    # Instatiate a network    
+    # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=optimal_parameters_list[2]),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
               ReluLayer(name="relu"),
@@ -629,12 +660,12 @@ def optimise_fm():
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': optimal_parameters_list[0],
-                    'nb_epoch': 1000,
+                    'nb_epoch': 10,
                     'learning_rate': optimal_parameters_list[1],
                     'loss_fun': "mse",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
-    
+
     trainer = TorchTrainer(
         problem_type="regression",
         network=network,
@@ -649,11 +680,12 @@ def optimise_fm():
     )
 
     trainer.train(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
-    
+
     # Evaluate results
     train_loss = trainer.eval_loss(x_train_pre, y_train_pre)
     val_loss = trainer.eval_loss(x_val_pre, y_val_pre)
     test_loss = trainer.eval_loss(x_test_pre, y_test_pre)
+    losses={" Train Loss": train_loss, "Validation Loss": val_loss, "Test Loss":test_loss }
 
     print("Optimised train loss = {0:.2f}".format(train_loss))
     print("Optimised validation loss = {0:.2f}".format(val_loss))
@@ -666,16 +698,14 @@ def optimise_fm():
                          hyper_params,
                          output_path,
                          readable_time,
-                         train_loss,
-                         val_loss,
-			             test_loss,
+                         losses,
                          y_preprocessor=y_preproc)
 
 
 def optimise_roi():
     device = "cpu"
-    
-    # Load and prepare data 
+
+    # Load and prepare data
     dataset = np.loadtxt("ROI_dataset.dat")
 
     # Split data
@@ -706,12 +736,13 @@ def optimise_roi():
     )
 
     trainer.set_optimisation(x_train_res, y_train_res, x_val_pre, y_val)
-    
+
     optimisation_parameters = [
         (10,200),
         (0.001, 0.2),
-        (10,100)        
-    ]
+        (10,100)]
+
+
 
     result = gp_minimize(trainer.optimise_hyperparameters,
                          optimisation_parameters,
@@ -752,7 +783,7 @@ def optimise_roi():
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
-    
+
     trainer = TorchTrainer(
         problem_type="classification",
         network=network,
@@ -765,20 +796,34 @@ def optimise_roi():
         device=device,
         log_output_path=output_path
     )
-    
+
     trainer.train(x_train_res, y_train_res, x_val_pre, y_val)
 
     train_loss = trainer.eval_loss(x_train_res, y_train_res)
     val_loss = trainer.eval_loss(x_val_pre, y_val)
     test_loss = trainer.eval_loss(x_test_pre, y_test)
-    
+
     # Evaluate results
     print("Optimised train loss = {0:.8f}".format(train_loss))
     print("Optimised validation loss = {0:.8f}".format(val_loss))
     print("Optimised test loss = {0:.8f}".format(test_loss))
 
+
+    train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
+    train_targ = y_train_res.argmax(axis=1).squeeze()
+
+    val_preds = (network.forward(x_val_pre)).detach().numpy().argmax(axis=1).squeeze()
+    val_targ = y_val.argmax(axis=1).squeeze()
+
+    test_preds = (network.forward(x_test_pre)).detach().numpy().argmax(axis=1).squeeze()
+    test_targ = y_test.argmax(axis=1).squeeze()
+
+    Train_confusion, Val_confusion, Test_confusion = confusion_matrices(train_preds,train_targ,val_preds,val_targ,test_preds,test_targ)
+
+    losses={" Train Loss": train_loss, "Validation Loss": val_loss, "Test Loss":test_loss }
+
     # Save model + hyperparamers to file
-    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time, train_loss, val_loss, test_loss)
+    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time,losses, Train_confusion, Val_confusion, Test_confusion)
 
 
 if __name__ == "__main__":

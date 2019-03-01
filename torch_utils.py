@@ -42,11 +42,10 @@ def save_training_output(network,
                          hyper_params,
                          output_path,
                          readable_time,
-                         train_loss,
-                         val_loss,
-                         test_loss,
+                         losses,
                          train_conf=None,
                          val_conf=None,
+                         test_conf=None,
                          y_preprocessor=None):
     """
     Saves training output to file
@@ -66,15 +65,6 @@ def save_training_output(network,
         for key, value in hyper_params.items():
             f.write(key + " = " + str(value) + "\n")
 
-        f.write("\n")
-        if train_conf != None:
-            for key, value in train_conf.items():
-                f.write(key + " = " + str(value) + "\n")
-            f.write("\n")
-            for key, value in val_conf.items():
-                f.write(key + " = " + str(value) + "\n")
-            f.write("\n")
-
         f.write("\n\nLayers:\n")
         for layer in layers:
             if layer.name == "linear":
@@ -84,9 +74,19 @@ def save_training_output(network,
             if layer.name == "dropout":
                 f.write(layer.name + "(p=" + str(layer.p) + ")\n")
 
-        f.write("Training Loss: " + str(train_loss) + "\n")
-        f.write("Validation Loss: " + str(val_loss) + "\n")
-        f.write("Test Loss: " + str(test_loss) + "\n")
+
+        for key, value in losses.items():
+            f.write(key + " = " + str(value))
+
+        f.write("\n")
+        if train_conf != None:
+            for key, value in train_conf.items():
+                f.write(key + str(value) + "\n\n")
+            for key, value in val_conf.items():
+                f.write(key + str(value) + "\n\n")
+            for key, value in test_conf.items():
+                f.write(key + str(value) + "\n\n")
+
 
     f.close()
 
