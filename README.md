@@ -1,5 +1,22 @@
 # README
 
+## FOR REVIEWERS: How to run learn_FM.py and learn_ROI.py
+
+To run these models with the hidden dataset, please run the following
+commands from the command line
+```
+python3 learn_FM.py -f hidden_dataset.dat
+```
+
+and
+
+```
+python3 learn_ROI.py -f hidden_dataset.dat
+```
+
+NB: these should run in the bitbucket nuric environment (where
+e.g. PyTorch is available).
+
 ## How to view PyTorch model outputs in Tensorboard
 
 As the PyTorch models train they log their output to a log file which

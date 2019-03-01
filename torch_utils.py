@@ -76,7 +76,7 @@ def save_training_output(network,
 
 
         for key, value in losses.items():
-            f.write(key + " = " + str(value))
+            f.write(key + " = " + str(value) + "\n")
 
         f.write("\n")
         if train_conf != None:
@@ -86,7 +86,6 @@ def save_training_output(network,
                 f.write(key + str(value) + "\n\n")
             for key, value in test_conf.items():
                 f.write(key + str(value) + "\n\n")
-
 
     f.close()
 

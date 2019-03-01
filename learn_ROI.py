@@ -1,3 +1,6 @@
+import sys
+import getopt
+
 import numpy as np
 
 from illustrate import illustrate_results_ROI
@@ -25,7 +28,22 @@ def main(dataset_filepath):
 
 if __name__ == "__main__":
 
-    # TODO: command line arguments
-    dataset_filepath = "ROI_dataset.dat"
+    # Get command line arguments
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hf:", ["file="])
+    except getopt.GetoptError:
+        print("learn_ROI.py -f <filepath>")
+        sys.exit(-1)
+
+    dataset_filepath = None
+    for opt, arg in opts:
+        if opt == '-h':
+            print("learn_ROI.py -f <filepath>")
+        elif opt in ("-f", "--filepath"):
+            dataset_filepath = arg
+
+    if dataset_filepath is None:
+        print("error: must provide filepath -f")
+        sys.exit(-1)
     
     main(dataset_filepath)

@@ -374,7 +374,7 @@ def train_fm(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 167,
-                    'nb_epoch': 1000,
+                    'nb_epoch': 100,
                     'learning_rate': 0.0005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
@@ -400,6 +400,10 @@ def train_fm(is_gpu_run=False):
     val_loss=trainer.eval_loss(x_val_pre, y_val_pre, y_preproc)
     test_loss=trainer.eval_loss(x_test_pre, y_test_pre, y_preproc)
 
+    losses = {'Training loss': train_loss,
+              'Validation loss': val_loss,
+              'Test loss': test_loss}
+    
     # Save model + hyperparamers to file
     print("Final train loss = {0:.8f}".format(train_loss))
     print("Final validation loss = {0:.8f}".format(val_loss))
@@ -411,9 +415,7 @@ def train_fm(is_gpu_run=False):
                          hyper_params,
                          output_path,
                          readable_time,
-                         train_loss,
-                         val_loss,
-			 test_loss,
+                         losses,
                          y_preprocessor=y_preproc)
 
     # Plot learning curves
