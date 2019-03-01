@@ -6,7 +6,7 @@ import pickle
 import collections
 import pprint
 
-from pytorch_net import SequentialNet
+from sequential_net import *
 
 # Named tuples available globally
 LinearLayer = collections.namedtuple("LinearLayer", "name in_dim out_dim")

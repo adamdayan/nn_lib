@@ -1,17 +1,56 @@
 Hyperparameters:
 batch_size = 32
-nb_epoch = 500
+nb_epoch = 50
 learning_rate = 0.001
 loss_fun = cross_entropy
 shuffle_flag = True
 optimizer = adam
 
 
-
 Layers:
 linear(3, 64)
 relu
 linear(64, 4)
-Training Loss: 0.7498865127563477
-Validation Loss: 0.7637049555778503
-Test Loss: 0.7609232068061829
+Train Loss = 0.75938880443573
+Validation Loss = 0.7776956558227539
+Test Loss = 0.780024528503418
+Train Accuracy = 0.9876161755981807
+Validation Accuracy = 0.9660691421254801
+Test Accuracy = 0.9628918746001279
+
+Train Confusion Matrix
+[[10114     0     0     0]
+ [    0 10071    24    19]
+ [    0     0 10114     0]
+ [   56   225   177  9656]]
+
+Recall0.9876161755981807
+
+Precision0.987797613085779
+
+F10.9877068860096593
+
+Val Confusion Matrix
+[[ 139    0    0    0]
+ [   0  158    1    0]
+ [   0    0   13    0]
+ [   7   29   16 1199]]
+
+Recall0.9880359863052954
+
+Precision0.8075769784875345
+
+F10.888738422034552
+
+Test Confusion Matrix
+[[ 152    0    0    0]
+ [   0  133    1    0]
+ [   0    0    8    0]
+ [   9   30   18 1212]]
+
+Recall0.9869050139374052
+
+Precision0.7640866488559206
+
+F10.8613187154021803
+
