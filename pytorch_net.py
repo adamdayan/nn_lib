@@ -122,7 +122,7 @@ class TorchTrainer():
         cut_points = np.arange(batch_size, input_dataset.shape[0], batch_size)
         return np.split(input_dataset, cut_points), np.split(target_dataset, cut_points)
 
-    def train(self, input_dataset, target_dataset, input_dataset_val, target_dataset_val, output_preprocessor):
+    def train(self, input_dataset, target_dataset, input_dataset_val, target_dataset_val, output_preprocessor=None):
 
         # Clear training loss metadata from any previous training runs
         self.epochs_w_loss_measure = []
@@ -245,12 +245,7 @@ class TorchTrainer():
             
         elif self.problem_type == "classification":
             layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
-                      # LinearLayer(name="linear", in_dim=8, out_dim=8),
                       ReluLayer(name="relu"),
-                      # DropoutLayer(name="dropout", p=0.5),
-                      # LinearLayer(name="linear", in_dim=8, out_dim=8),
-                      # ReluLayer(name="relu"),
-                      # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=64, out_dim=4),
                       SoftmaxLayer(name="softmax")]
             
@@ -295,11 +290,8 @@ class TorchTrainer():
             
             return validation_loss.item()
                 
-        
 
-
-
-    def eval_loss(self, input_dataset, target_dataset, output_preprocessor):
+    def eval_loss(self, input_dataset, target_dataset, output_preprocessor=None):
         """
         Calculates loss from the network
         NB: turns off dropout and gradient caching as not required when performing an eval
@@ -312,18 +304,20 @@ class TorchTrainer():
 
             # Forward pass
             output_tensor = self.network.forward(input_dataset)
-            output_reverted = torch.from_numpy(output_preprocessor.revert(output_tensor.detach().numpy()))
-
+        
             # Calculate loss
             if self.problem_type == "regression":
+                output_reverted = torch.from_numpy(output_preprocessor.revert(output_tensor.detach().numpy()))
                 target_tensor = torch.from_numpy(target_dataset).float()
+                target_tensor = target_tensor.to(self.device)
+                target_reverted = torch.from_numpy(output_preprocessor.revert(target_tensor.detach().numpy()))
             elif self.problem_type == "classification":
                 # https://discuss.pytorch.org/t/loss-functions-for-batches/20488
+                output_reverted = output_tensor
                 target_tensor = torch.from_numpy(target_dataset).type(torch.long)
                 target_tensor = target_tensor.argmax(1)
-
-            target_tensor = target_tensor.to(self.device)
-            target_reverted = torch.from_numpy(output_preprocessor.revert(target_tensor.detach().numpy()))
+                target_reverted = target_tensor
+            
             loss = self.loss_criterion(output_reverted, target_reverted)
 
             return loss.item()
@@ -512,12 +506,7 @@ def train_roi(is_gpu_run=False):
 
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
-              # LinearLayer(name="linear", in_dim=8, out_dim=8),
               ReluLayer(name="relu"),
-              # DropoutLayer(name="dropout", p=0.5),
-              # LinearLayer(name="linear", in_dim=8, out_dim=8),
-              # ReluLayer(name="relu"),
-              # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=64, out_dim=4),
               SoftmaxLayer(name="softmax")]
 
