@@ -121,7 +121,7 @@ class TorchTrainer():
         cut_points = np.arange(batch_size, input_dataset.shape[0], batch_size)
         return np.split(input_dataset, cut_points), np.split(target_dataset, cut_points)
 
-    def train(self, input_dataset, target_dataset, input_dataset_val, target_dataset_val):
+    def train(self, input_dataset, target_dataset, input_dataset_val, target_dataset_val, output_preprocessor):
 
         # Clear training loss metadata from any previous training runs
         self.epochs_w_loss_measure = []
@@ -158,8 +158,10 @@ class TorchTrainer():
                     # https://discuss.pytorch.org/t/loss-functions-for-batches/20488
                     batch_target = torch.from_numpy(batched_target[idx]).type(torch.long)
                     batch_target = batch_target.argmax(1)
-                    
+
                 batch_target = batch_target.to(self.device)
+                # batch_output_reverted = torch.from_numpy(output_preprocessor.revert(batch_output.detach().numpy()))
+                # batch_target_reverted = torch.from_numpy(output_preprocessor.revert(batch_target.detach().numpy()))
                 batch_loss = self.loss_criterion(batch_output, batch_target)
 
                 # Backprop
@@ -170,8 +172,8 @@ class TorchTrainer():
                 self.optimizer.step()
 
             if epoch % (self.nb_epoch / 100) == 0:
-                training_loss = self.eval_loss(input_dataset, target_dataset)
-                validation_loss = self.eval_loss(input_dataset_val, target_dataset_val)
+                training_loss = self.eval_loss(input_dataset, target_dataset, output_preprocessor)
+                validation_loss = self.eval_loss(input_dataset_val, target_dataset_val, output_preprocessor)
 
                 self.epochs_w_loss_measure.append(epoch)
                 self.training_losses.append(training_loss)
@@ -219,7 +221,7 @@ class TorchTrainer():
         self.y_train = y_train
         self.x_val = x_val
         self.y_val = y_val
-                        
+
     def optimise_hyperparameters(self, params):
         #extract params from input array
         batch_size = params[0]
@@ -241,7 +243,7 @@ class TorchTrainer():
                       ReluLayer(name="relu"),
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=3)]
-            
+
         elif self.problem_type == "classification":
             layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
                       # LinearLayer(name="linear", in_dim=8, out_dim=8),
@@ -252,7 +254,7 @@ class TorchTrainer():
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=64, out_dim=4),
                       SoftmaxLayer(name="softmax")]
-            
+
         network = SequentialNet(layers, self.device)
         optimiser = optim.Adam(network.parameters(), lr=learning_rate)
 
@@ -260,7 +262,7 @@ class TorchTrainer():
         input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
         batched_input, batched_target = self.minibatch_data(input_dataset, target_dataset, batch_size)
 
-        #train model 
+        #train model
         for epoch in range(1, self.nb_epoch + 1):
             network.train()
 
@@ -291,12 +293,12 @@ class TorchTrainer():
                 target_tensor = target_tensor.argmax(1)
 
             validation_loss = self.loss_criterion(output_tensor, target_tensor)
-            
-            return validation_loss.item()
-                
-        
 
-    def eval_loss(self, input_dataset, target_dataset):
+            return validation_loss.item()
+
+
+
+    def eval_loss(self, input_dataset, target_dataset, output_preprocessor):
         """
         Calculates loss from the network
         NB: turns off dropout and gradient caching as not required when performing an eval
@@ -309,6 +311,7 @@ class TorchTrainer():
 
             # Forward pass
             output_tensor = self.network.forward(input_dataset)
+            output_reverted = torch.from_numpy(output_preprocessor.revert(output_tensor.detach().numpy()))
 
             # Calculate loss
             if self.problem_type == "regression":
@@ -319,7 +322,8 @@ class TorchTrainer():
                 target_tensor = target_tensor.argmax(1)
 
             target_tensor = target_tensor.to(self.device)
-            loss = self.loss_criterion(output_tensor, target_tensor)
+            target_reverted = torch.from_numpy(output_preprocessor.revert(target_tensor.detach().numpy()))
+            loss = self.loss_criterion(output_reverted, target_reverted)
 
             return loss.item()
 
@@ -349,28 +353,28 @@ def train_fm(is_gpu_run=False):
     y_train_pre = y_preproc.apply(y_train)
     y_val_pre = y_preproc.apply(y_val)
     y_test_pre = y_preproc.apply(y_test)
-    
+
     # Instatiate a network
-    layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
+    layers = [LinearLayer(name="linear", in_dim=3, out_dim=200),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
-              TanhLayer(name="tanh"),
-              # DropoutLayer(name="dropout", p=0.2),
-              LinearLayer(name="linear", in_dim=32, out_dim=32),
-              TanhLayer(name="tanh"),
+              ReluLayer(name="relu"),
+              #DropoutLayer(name="dropout", p=0.2),
+              LinearLayer(name="linear", in_dim=200, out_dim=200),
+              ReluLayer(name="relu"),
               # DropoutLayer(name="dropout", p=0.5),
               # LinearLayer(name="linear", in_dim=64, out_dim=64),
               # TanhLayer(name="tanh"),
-              # DropoutLayer(name="dropout", p=0.5),
-              LinearLayer(name="linear", in_dim=32, out_dim=3)]
+              #DropoutLayer(name="dropout", p=0.5),
+              LinearLayer(name="linear", in_dim=200, out_dim=3)]
 
     network = SequentialNet(layers, device)
     print("Network instantiated:")
     print(network)
 
     # Add the network to a trainer and train
-    hyper_params = {'batch_size': 32,
+    hyper_params = {'batch_size': 167,
                     'nb_epoch': 1000,
-                    'learning_rate': 0.005,
+                    'learning_rate': 0.0005,
                     'loss_fun': "mse",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
@@ -388,18 +392,18 @@ def train_fm(is_gpu_run=False):
         log_output_path=output_path
     )
 
-    trainer.train(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
+    trainer.train(x_train_pre, y_train_pre, x_val_pre, y_val_pre,y_preproc)
 
     # Evaluate results
-    train_loss=trainer.eval_loss(x_train_pre, y_train_pre)
-    val_loss=trainer.eval_loss(x_val_pre, y_val_pre)
-    test_loss=trainer.eval_loss(x_test_pre, y_test_pre)
+    train_loss=trainer.eval_loss(x_train_pre, y_train_pre, y_preproc)
+    val_loss=trainer.eval_loss(x_val_pre, y_val_pre, y_preproc)
+    test_loss=trainer.eval_loss(x_test_pre, y_test_pre, y_preproc)
 
     # Save model + hyperparamers to file
     print("Final train loss = {0:.8f}".format(train_loss))
     print("Final validation loss = {0:.8f}".format(val_loss))
     print("Final test loss = {0:.8f}".format(test_loss))
-    
+
     save_training_output(network,
                          layers,
                          x_preproc,
@@ -504,7 +508,7 @@ def train_roi(is_gpu_run=False):
     # Evaluate results
     print("Final train loss = {0:.8f}".format(train_loss))
     print("Final validation loss = {0:.8f}".format(val_loss))
-    print("Final test loss = {0:.8f}".format(test_loss))	
+    print("Final test loss = {0:.8f}".format(test_loss))
 
     train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
     train_targ = y_train_res.argmax(axis=1).squeeze()
@@ -549,8 +553,8 @@ def train_roi(is_gpu_run=False):
 
 def optimise_fm():
     device = "cpu"
-    
-    # Load and prepare data 
+
+    # Load and prepare data
     dataset = np.loadtxt("FM_dataset.dat")
 
     # Split data
@@ -585,11 +589,11 @@ def optimise_fm():
     )
 
     trainer.set_optimisation(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
-    
+
     optimisation_parameters = [
         (10,250),
         (0.0005, 0.2),
-        (10,200)        
+        (10,200)
     ]
 
     result = gp_minimize(trainer.optimise_hyperparameters,
@@ -610,7 +614,7 @@ def optimise_fm():
     optimal_parameters_list = result.get("x")
     output_path, readable_time = create_output_folder("best_fm")
 
-    # Instatiate a network    
+    # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=optimal_parameters_list[2]),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
               ReluLayer(name="relu"),
@@ -634,7 +638,7 @@ def optimise_fm():
                     'loss_fun': "mse",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
-    
+
     trainer = TorchTrainer(
         problem_type="regression",
         network=network,
@@ -649,7 +653,7 @@ def optimise_fm():
     )
 
     trainer.train(x_train_pre, y_train_pre, x_val_pre, y_val_pre)
-    
+
     # Evaluate results
     train_loss = trainer.eval_loss(x_train_pre, y_train_pre)
     val_loss = trainer.eval_loss(x_val_pre, y_val_pre)
@@ -674,8 +678,8 @@ def optimise_fm():
 
 def optimise_roi():
     device = "cpu"
-    
-    # Load and prepare data 
+
+    # Load and prepare data
     dataset = np.loadtxt("ROI_dataset.dat")
 
     # Split data
@@ -706,11 +710,11 @@ def optimise_roi():
     )
 
     trainer.set_optimisation(x_train_res, y_train_res, x_val_pre, y_val)
-    
+
     optimisation_parameters = [
         (10,200),
         (0.001, 0.2),
-        (10,100)        
+        (10,100)
     ]
 
     result = gp_minimize(trainer.optimise_hyperparameters,
@@ -752,7 +756,7 @@ def optimise_roi():
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
-    
+
     trainer = TorchTrainer(
         problem_type="classification",
         network=network,
@@ -765,13 +769,13 @@ def optimise_roi():
         device=device,
         log_output_path=output_path
     )
-    
+
     trainer.train(x_train_res, y_train_res, x_val_pre, y_val)
 
     train_loss = trainer.eval_loss(x_train_res, y_train_res)
     val_loss = trainer.eval_loss(x_val_pre, y_val)
     test_loss = trainer.eval_loss(x_test_pre, y_test)
-    
+
     # Evaluate results
     print("Optimised train loss = {0:.8f}".format(train_loss))
     print("Optimised validation loss = {0:.8f}".format(val_loss))
