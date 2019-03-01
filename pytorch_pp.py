@@ -32,9 +32,9 @@ class DataStats(object):
 
     def plot_data_box_plot(self, data):
         """
-        Creates a box plot of the data 
+        Creates a box plot of the data
         """
-        
+
         # Box plot of mean, variance and range etc
         # https://towardsdatascience.com/understanding-boxplots-5e2df7bcbd51
         plt.figure(figsize=(20,10))
@@ -152,7 +152,6 @@ def split_train_val_test(dataset, last_feature_idx):
     x = dataset[:, :(last_feature_idx + 1)]
     y = dataset[:, (last_feature_idx + 1):]
 
-    # TODO: CHECK THE SPLIT THOROUGLY
     # Split the dataset into train, val, test
     train_idx = int(0.8 * len(x))
 
@@ -182,7 +181,7 @@ def split_train_val_test(dataset, last_feature_idx):
     return x_train, y_train, x_val, y_val, x_test, y_test
 
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
 
     print("Plotting stats for FM_dataset.dat")
     data_fm = np.loadtxt("FM_dataset.dat")
@@ -191,4 +190,3 @@ if __name__ == "__main__":
     print("Plotting stats for ROI_dataset.dat")
     data_roi = np.loadtxt("ROI_dataset.dat")
     torch_pp_fm = DataStats(data_roi, split_idx=2, dataset_name="ROI", problem_type="regression")
-

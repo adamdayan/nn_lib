@@ -16,6 +16,7 @@ from pytorch_pp import *
 from sklearn.metrics import confusion_matrix
 from torch_utils import *
 from evaluation_utils import *
+from scipy.special import softmax
 
 class SequentialNet(nn.Module):
 
@@ -409,7 +410,7 @@ def train_fm(is_gpu_run=False):
                          readable_time,
                          train_loss,
                          val_loss,
-			             test_loss,
+			 test_loss,
                          y_preprocessor=y_preproc)
 
     # Plot learning curves
@@ -523,7 +524,7 @@ def train_roi(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 500,
+                    'nb_epoch': 50,
                     'learning_rate': 0.001,
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
@@ -546,21 +547,34 @@ def train_roi(is_gpu_run=False):
     train_loss = trainer.eval_loss(x_train_res, y_train_res)
     val_loss = trainer.eval_loss(x_val_pre, y_val)
     test_loss = trainer.eval_loss(x_test_pre, y_test)
-    losses={" Train Loss": train_loss, "Validation Loss": val_loss, "Test Loss":test_loss }
 
     # Evaluate results
     print("Final train loss = {0:.8f}".format(train_loss))
     print("Final validation loss = {0:.8f}".format(val_loss))
     print("Final test loss = {0:.8f}".format(test_loss))
 
-    train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
+    train_preds = (network.forward(x_train_res)).detach().numpy()
+    train_preds = softmax(train_preds).argmax(axis=1).squeeze()
     train_targ = y_train_res.argmax(axis=1).squeeze()
 
-    val_preds = (network.forward(x_val_pre)).detach().numpy().argmax(axis=1).squeeze()
+    val_preds = (network.forward(x_val_pre)).detach().numpy()
+    val_preds = softmax(val_preds).argmax(axis=1).squeeze()
     val_targ = y_val.argmax(axis=1).squeeze()
 
-    test_preds = (network.forward(x_test_pre)).detach().numpy().argmax(axis=1).squeeze()
+    test_preds = (network.forward(x_test_pre)).detach().numpy()
+    test_preds = softmax(test_preds).argmax(axis=1).squeeze()
     test_targ = y_test.argmax(axis=1).squeeze()
+
+    train_accuracy = (train_preds == train_targ).mean()
+    val_accuracy = (val_preds == val_targ).mean()
+    test_accuracy = (test_preds == test_targ).mean()
+
+    losses={"Train Loss": train_loss,
+            "Validation Loss": val_loss,
+            "Test Loss": test_loss,
+            "Train Accuracy": train_accuracy,
+            "Validation Accuracy": val_accuracy,
+            "Test Accuracy": test_accuracy}
 
     Train_confusion, Val_confusion, Test_confusion = confusion_matrices(train_preds,train_targ,val_preds,val_targ,test_preds,test_targ)
 
@@ -575,6 +589,38 @@ def train_roi(is_gpu_run=False):
                          Train_confusion,
                          Val_confusion,
                          Test_confusion)
+
+    # Plot loss and accuracy vs number of epochs
+    # to check how well model is training (e.g. is there overfitting)
+    plt.figure(figsize=(20,10))
+    plt.suptitle("Loss and accuracy vs epochs for " + hyper_params['loss_fun'])
+    # Description of the hyperparams
+    hyperparams_text = "Hyperparameters: \n " + \
+                 "- lr = " + str(hyper_params['learning_rate']) + \
+                 "\n - batch_size = " + str(hyper_params['batch_size']) + \
+                 "\n - loss function = " + hyper_params['loss_fun'] + \
+                 "\n - number of epochs = " + str(hyper_params['nb_epoch'])
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    plt.figtext(0.75, 0.75, hyperparams_text, bbox=props)
+
+    # Plot loss vs number of epochs
+    plt.subplot(2, 1, 1)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.training_losses)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.validation_losses)
+    plt.legend(['training', 'validation'], loc='upper left')
+    plt.xlabel("Number of epochs")
+    plt.ylabel("Loss (" + hyper_params['loss_fun'] + ")")
+
+    # Plot accuracy vs number of epochs
+    plt.subplot(2, 1, 2)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.training_accuracies)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.validation_accuracies)
+    plt.legend(['training', 'validation'], loc='upper left')
+    plt.xlabel("Number of epochs")
+    plt.ylabel("Accuracy (" + hyper_params['loss_fun'] + ")")
+    plt.ylim(0, 1)
+    plt.gca().set_yticklabels(['{:.0f}%'.format(x*100) for x in plt.gca().get_yticks()]) 
+    plt.savefig(output_path + "/" + hyper_params['loss_fun'] + "_loss_plot.png")
 
 
 
@@ -809,13 +855,16 @@ def optimise_roi():
     print("Optimised test loss = {0:.8f}".format(test_loss))
 
 
-    train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
+    train_preds = (network.forward(x_train_res)).detach().numpy()
+    train_preds = softmax(train_preds).argmax(axis=1).squeeze()
     train_targ = y_train_res.argmax(axis=1).squeeze()
 
-    val_preds = (network.forward(x_val_pre)).detach().numpy().argmax(axis=1).squeeze()
+    val_preds = (network.forward(x_val_pre)).detach().numpy()
+    val_preds = softmax(val_preds).argmax(axis=1).squeeze()
     val_targ = y_val.argmax(axis=1).squeeze()
 
-    test_preds = (network.forward(x_test_pre)).detach().numpy().argmax(axis=1).squeeze()
+    test_preds = (network.forward(x_test_pre)).detach().numpy()
+    test_preds = softmax(val_preds).argmax(axis=1).squeeze()
     test_targ = y_test.argmax(axis=1).squeeze()
 
     Train_confusion, Val_confusion, Test_confusion = confusion_matrices(train_preds,train_targ,val_preds,val_targ,test_preds,test_targ)
