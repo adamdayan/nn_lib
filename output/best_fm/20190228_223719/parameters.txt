@@ -1,0 +1,19 @@
+Hyperparameters:
+batch_size = 195
+nb_epoch = 1000
+learning_rate = 0.002067125968626362
+loss_fun = mse
+shuffle_flag = True
+optimizer = adam
+
+
+
+Layers:
+linear(3, 200)
+relu
+linear(200, 200)
+relu
+linear(200, 3)
+Training Loss: 9.170634257316124e-06
+Validation Loss: 1.106087802327238e-05
+Test Loss: 1.0035738341684919e-05

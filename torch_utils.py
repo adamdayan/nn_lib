@@ -24,7 +24,8 @@ def create_output_folder(run_type):
     # Create a timestamp for saving results
     timestamp = time.time()
     timestamp = datetime.datetime.fromtimestamp(timestamp)
-    readable_time = str(timestamp.year) + str(timestamp.month).zfill(2) + str(timestamp.day).zfill(2) + "_" + str(timestamp.hour).zfill(2) + str(timestamp.minute).zfill(2) + str(timestamp.second).zfill(2)
+    readable_time = str(timestamp.year) + str(timestamp.month).zfill(2) + str(timestamp.day).zfill(2) + "_" + str(
+        timestamp.hour).zfill(2) + str(timestamp.minute).zfill(2) + str(timestamp.second).zfill(2)
 
     # Create an output folder for this run
     output_path = "output/" + run_type + "/" + readable_time + "/"
@@ -43,10 +44,10 @@ def save_training_output(network,
                          readable_time,
                          train_loss,
                          val_loss,
-			 test_loss,
-                         train_conf = None,
-                         val_conf = None,
-                         y_preprocessor = None):
+                         test_loss,
+                         train_conf=None,
+                         val_conf=None,
+                         y_preprocessor=None):
     """
     Saves training output to file
     """
@@ -57,8 +58,8 @@ def save_training_output(network,
     # Save hyperparameters to log file
     parameter_out_file = output_path + "/parameters.txt"
     with open(parameter_out_file, 'w') as f:
-        #f.write("------ LOG FILE ------\n")
-        #f.write("Model ran at " + str(readable_time) + "\n\n")
+        # f.write("------ LOG FILE ------\n")
+        # f.write("Model ran at " + str(readable_time) + "\n\n")
 
         f.write("Hyperparameters:\n")
 
@@ -83,8 +84,8 @@ def save_training_output(network,
             if layer.name == "dropout":
                 f.write(layer.name + "(p=" + str(layer.p) + ")\n")
 
-        f.write("Training Loss: " + str(train_loss)+"\n")
-        f.write("Validation Loss: " + str(val_loss)+ "\n")
+        f.write("Training Loss: " + str(train_loss) + "\n")
+        f.write("Validation Loss: " + str(val_loss) + "\n")
         f.write("Test Loss: " + str(test_loss) + "\n")
 
     f.close()
@@ -138,7 +139,7 @@ def load_torch_model(
 
         print("y_preprocessor loaded:")
         pprint.pprint(vars(y_preprocessor))
-    
+
     # Load layers config
     with open(model_layers_filename, "rb") as f:
         model_layers = pickle.load(f)

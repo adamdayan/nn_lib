@@ -14,7 +14,7 @@ def main(dataset_filepath):
     model, x_pp, _ = load_torch_model(model_path + "model.pt",
                                       model_path + "layers.pickle",
                                       model_path + "x_preprocessor.pickle")
-    evaluate_architecture(model_path, dataset)
+    evaluate_architecture(model_path, dataset, "classification")
 
     # Normalise data using training pre-processor
     dataset = x_pp.apply(dataset[:, :3])

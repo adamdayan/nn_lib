@@ -235,10 +235,10 @@ class TorchTrainer():
             #build network
             layers = [LinearLayer(name="linear", in_dim=3, out_dim=hidden_layer_neurons),
                       # LinearLayer(name="linear", in_dim=8, out_dim=8),
-                      TanhLayer(name="relu"),
+                      ReluLayer(name="relu"),
                       # DropoutLayer(name="dropout", p=0.2),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=hidden_layer_neurons),
-                      TanhLayer(name="relu"),
+                      ReluLayer(name="relu"),
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=3)]
             
@@ -339,19 +339,16 @@ def train_fm(is_gpu_run=False):
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
     # Preprocess the features
-    x_preproc = TorchPreprocessor(x_train,-1,1)
+    x_preproc = TorchPreprocessor(x_train, -1, 1)
     x_train_pre = x_preproc.apply(x_train)
     x_val_pre = x_preproc.apply(x_val)
     x_test_pre = x_preproc.apply(x_test)
 
     # Also preprocess the targets for regression
-    y_preproc = TorchPreprocessor(y_train, -1, 1)
+    y_preproc = TorchPreprocessor(y_train, -1, 1, "normalise")
     y_train_pre = y_preproc.apply(y_train)
     y_val_pre = y_preproc.apply(y_val)
     y_test_pre = y_preproc.apply(y_test)
-    # y_train_pre = y_train
-    # y_val_pre = y_val
-    # y_test_pre = y_test
     
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=32),
@@ -367,7 +364,7 @@ def train_fm(is_gpu_run=False):
               LinearLayer(name="linear", in_dim=32, out_dim=3)]
 
     network = SequentialNet(layers, device)
-    print("Network instatiated:")
+    print("Network instantiated:")
     print(network)
 
     # Add the network to a trainer and train
@@ -411,7 +408,7 @@ def train_fm(is_gpu_run=False):
                          readable_time,
                          train_loss,
                          val_loss,
-			 test_loss,
+			             test_loss,
                          y_preprocessor=y_preproc)
 
     # Plot learning curves
@@ -453,7 +450,7 @@ def train_roi(is_gpu_run=False):
     # Split data
     x_train, y_train, x_val, y_val, x_test, y_test = split_train_val_test(dataset, 2)
 
-    # TODO: preprocess the data
+    # Preprocess the data
     train_prep = TorchPreprocessor(x_train,-1,1)
     x_train_pre = train_prep.apply(x_train)
     x_val_pre = train_prep.apply(x_val)
@@ -500,9 +497,9 @@ def train_roi(is_gpu_run=False):
     )
 
     trainer.train(x_train_res, y_train_res, x_val_pre, y_val)
-    train_loss=trainer.eval_loss(x_train_res, y_train_res)
-    val_loss=trainer.eval_loss(x_val_pre, y_val)
-    test_loss=trainer.eval_loss(x_test_pre, y_test)
+    train_loss = trainer.eval_loss(x_train_res, y_train_res)
+    val_loss = trainer.eval_loss(x_val_pre, y_val)
+    test_loss = trainer.eval_loss(x_test_pre, y_test)
 
     # Evaluate results
     print("Final train loss = {0:.8f}".format(train_loss))
@@ -539,8 +536,15 @@ def train_roi(is_gpu_run=False):
 
 
     # Save model + hyperparamers to file
-    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time
-                         , train_loss, val_loss, test_loss)
+    save_training_output(network,
+                         layers,
+                         train_prep,
+                         hyper_params,
+                         output_path,
+                         readable_time,
+                         train_loss,
+                         val_loss,
+                         test_loss)
 
 
 def optimise_fm():
@@ -560,7 +564,7 @@ def optimise_fm():
     x_test_pre = x_preproc.apply(x_test)
 
     # Also preprocess the targets for regression
-    y_preproc = TorchPreprocessor(y_train, -1, 1)
+    y_preproc = TorchPreprocessor(y_train, -1, 1, "normalise")
     y_train_pre = y_preproc.apply(y_train)
     y_val_pre = y_preproc.apply(y_val)
     y_test_pre = y_preproc.apply(y_test)
@@ -664,7 +668,7 @@ def optimise_fm():
                          readable_time,
                          train_loss,
                          val_loss,
-			 test_loss,
+			             test_loss,
                          y_preprocessor=y_preproc)
 
 
@@ -683,6 +687,9 @@ def optimise_roi():
     x_val_pre = train_prep.apply(x_val)
     x_test_pre = train_prep.apply(x_test)
 
+    resampler = ROIResampler(x_train_pre, y_train, 6)
+    x_train_res, y_train_res = resampler.resample()
+
     network = SequentialNet([LinearLayer(name="linear", in_dim=3, out_dim=32)])
     trainer = TorchTrainer(
         problem_type="classification",
@@ -698,7 +705,7 @@ def optimise_roi():
         optimise_flag=True
     )
 
-    trainer.set_optimisation(x_train_pre, y_train, x_val_pre, y_val)
+    trainer.set_optimisation(x_train_res, y_train_res, x_val_pre, y_val)
     
     optimisation_parameters = [
         (10,200),
@@ -759,9 +766,9 @@ def optimise_roi():
         log_output_path=output_path
     )
     
-    trainer.train(x_train_pre, y_train, x_val_pre, y_val)
+    trainer.train(x_train_res, y_train_res, x_val_pre, y_val)
 
-    train_loss = trainer.eval_loss(x_train_pre, y_train)
+    train_loss = trainer.eval_loss(x_train_res, y_train_res)
     val_loss = trainer.eval_loss(x_val_pre, y_val)
     test_loss = trainer.eval_loss(x_test_pre, y_test)
     

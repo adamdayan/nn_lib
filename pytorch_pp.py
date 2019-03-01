@@ -83,19 +83,31 @@ class DataStats(object):
 
 class TorchPreprocessor(object):
 
-    def __init__(self, data, lower_bound, upper_bound):
+    def __init__(self, data, lower_bound, upper_bound, type="feature_scaling"):
+
+        self.type = type
 
         self.min_x = np.min(data, axis=0)
         self.max_x = np.max(data, axis=0)
         self.lower = lower_bound
         self.upper = upper_bound
+        self.mean = np.mean(data, axis=0)
+        self.stds = np.std(data, axis=0)
 
     def apply(self, x):
+
+        if self.type == "normalise":
+            return (x - self.mean)/self.stds
+
         return self.lower + (((x - self.min_x) * (self.upper - self.lower)) / (self.max_x - self.min_x))
 
     def revert(self, x):
+
+        if self.type == "normalise":
+            return (x * self.stds) + self.means
+
         return self.min_x + (((x - self.lower) * (self.max_x - self.min_x)) / (self.upper - self.lower))
-    
+
 
 class ROIResampler():
 

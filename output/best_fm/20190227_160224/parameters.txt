@@ -1,0 +1,17 @@
+------ LOG FILE ------
+Model ran at 20190227_160224
+
+Hyperparameters:
+batch_size = 164
+nb_epoch = 1000
+learning_rate = 0.08523509116872433
+loss_fun = cross_entropy
+shuffle_flag = True
+optimizer = adam
+
+
+Layers:
+linear(3, 62)
+relu
+linear(62, 62)
+linear(62, 3)
