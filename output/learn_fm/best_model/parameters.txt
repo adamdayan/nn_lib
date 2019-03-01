@@ -1,7 +1,7 @@
 Hyperparameters:
 batch_size = 167
 nb_epoch = 1000
-learning_rate = 0.0005
+learning_rate = 0.0001
 loss_fun = mse
 shuffle_flag = True
 optimizer = adam
@@ -9,9 +9,9 @@ optimizer = adam
 
 
 Layers:
-linear(3, 64)
-linear(64, 64)
-linear(64, 3)
-Training Loss: 0.703184376154331
-Validation Loss: 0.7219918490955982
-Test Loss: 0.6925858503499697
+linear(3, 200)
+linear(200, 200)
+linear(200, 3)
+Training Loss: 0.243844684145449
+Validation Loss: 0.24182947938959082
+Test Loss: 0.22132595192272464
