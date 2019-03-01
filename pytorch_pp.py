@@ -152,7 +152,6 @@ def split_train_val_test(dataset, last_feature_idx):
     x = dataset[:, :(last_feature_idx + 1)]
     y = dataset[:, (last_feature_idx + 1):]
 
-    # TODO: CHECK THE SPLIT THOROUGLY
     # Split the dataset into train, val, test
     train_idx = int(0.8 * len(x))
 

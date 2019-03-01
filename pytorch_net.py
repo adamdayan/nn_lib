@@ -16,6 +16,7 @@ from pytorch_pp import *
 from sklearn.metrics import confusion_matrix
 from torch_utils import *
 from evaluation_utils import *
+from scipy.special import softmax
 
 class SequentialNet(nn.Module):
 
@@ -158,10 +159,8 @@ class TorchTrainer():
                     # https://discuss.pytorch.org/t/loss-functions-for-batches/20488
                     batch_target = torch.from_numpy(batched_target[idx]).type(torch.long)
                     batch_target = batch_target.argmax(1)
-
+                    
                 batch_target = batch_target.to(self.device)
-                # batch_output_reverted = torch.from_numpy(output_preprocessor.revert(batch_output.detach().numpy()))
-                # batch_target_reverted = torch.from_numpy(output_preprocessor.revert(batch_target.detach().numpy()))
                 batch_loss = self.loss_criterion(batch_output, batch_target)
 
                 # Backprop
@@ -221,7 +220,7 @@ class TorchTrainer():
         self.y_train = y_train
         self.x_val = x_val
         self.y_val = y_val
-
+                        
     def optimise_hyperparameters(self, params):
         #extract params from input array
         batch_size = params[0]
@@ -243,7 +242,7 @@ class TorchTrainer():
                       ReluLayer(name="relu"),
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=hidden_layer_neurons, out_dim=3)]
-
+            
         elif self.problem_type == "classification":
             layers = [LinearLayer(name="linear", in_dim=3, out_dim=64),
                       # LinearLayer(name="linear", in_dim=8, out_dim=8),
@@ -254,7 +253,7 @@ class TorchTrainer():
                       # DropoutLayer(name="dropout", p=0.5),
                       LinearLayer(name="linear", in_dim=64, out_dim=4),
                       SoftmaxLayer(name="softmax")]
-
+            
         network = SequentialNet(layers, self.device)
         optimiser = optim.Adam(network.parameters(), lr=learning_rate)
 
@@ -262,7 +261,7 @@ class TorchTrainer():
         input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
         batched_input, batched_target = self.minibatch_data(input_dataset, target_dataset, batch_size)
 
-        #train model
+        #train model 
         for epoch in range(1, self.nb_epoch + 1):
             network.train()
 
@@ -293,8 +292,10 @@ class TorchTrainer():
                 target_tensor = target_tensor.argmax(1)
 
             validation_loss = self.loss_criterion(output_tensor, target_tensor)
-
+            
             return validation_loss.item()
+                
+        
 
 
 
@@ -353,18 +354,18 @@ def train_fm(is_gpu_run=False):
     y_train_pre = y_preproc.apply(y_train)
     y_val_pre = y_preproc.apply(y_val)
     y_test_pre = y_preproc.apply(y_test)
-
+    
     # Instatiate a network
     layers = [LinearLayer(name="linear", in_dim=3, out_dim=200),
               # LinearLayer(name="linear", in_dim=8, out_dim=8),
-              ReluLayer(name="relu"),
+              TanhLayer(name="tanh"),
               #DropoutLayer(name="dropout", p=0.2),
               LinearLayer(name="linear", in_dim=200, out_dim=200),
-              ReluLayer(name="relu"),
+              TanhLayer(name="tanh"),
               # DropoutLayer(name="dropout", p=0.5),
               # LinearLayer(name="linear", in_dim=64, out_dim=64),
               # TanhLayer(name="tanh"),
-              #DropoutLayer(name="dropout", p=0.5),
+              # DropoutLayer(name="dropout", p=0.5),
               LinearLayer(name="linear", in_dim=200, out_dim=3)]
 
     network = SequentialNet(layers, device)
@@ -403,7 +404,7 @@ def train_fm(is_gpu_run=False):
     print("Final train loss = {0:.8f}".format(train_loss))
     print("Final validation loss = {0:.8f}".format(val_loss))
     print("Final test loss = {0:.8f}".format(test_loss))
-
+    
     save_training_output(network,
                          layers,
                          x_preproc,
@@ -412,7 +413,7 @@ def train_fm(is_gpu_run=False):
                          readable_time,
                          train_loss,
                          val_loss,
-			             test_loss,
+			 test_loss,
                          y_preprocessor=y_preproc)
 
     # Plot learning curves
@@ -437,6 +438,49 @@ def train_fm(is_gpu_run=False):
     plt.ylabel("Loss (" + hyper_params['loss_fun'] + ")")
 
     plt.savefig(output_path + "/" + hyper_params['loss_fun'] + "_loss_plot.png")
+
+
+def confusion_matrices(train_preds,train_targ,val_preds,val_targ,test_preds,test_targ):
+
+        #Training data confusion matrix
+        conf_matrix=confusion_matrix(train_targ,train_preds)
+        recall=recall_calculator(conf_matrix)
+        precision=precision_calculator(conf_matrix)
+        f1=f1_score_calculator(precision,recall)
+
+        Train_confusion = {
+        "Train Confusion Matrix" + "\n" : conf_matrix,
+        'Recall': recall,
+        'Precision' : precision,
+        'F1' : f1}
+
+
+
+        #Validation data confusion matrix
+        conf_matrix=confusion_matrix(val_targ,val_preds)
+        recall=recall_calculator(conf_matrix)
+        precision=precision_calculator(conf_matrix)
+        f1=f1_score_calculator(precision,recall)
+
+        Val_confusion = {
+        "Val Confusion Matrix" + "\n"  : conf_matrix,
+        'Recall' : recall,
+        'Precision' : precision,
+        'F1' : f1}
+
+        #Test data confusion matrix
+        conf_matrix=confusion_matrix(test_targ,test_preds)
+        recall=recall_calculator(conf_matrix)
+        precision=precision_calculator(conf_matrix)
+        f1=f1_score_calculator(precision,recall)
+
+        Test_confusion = {
+        "Test Confusion Matrix" + "\n"  : conf_matrix,
+        'Recall' : recall,
+        'Precision' : precision,
+        'F1' : f1}
+
+        return Train_confusion, Val_confusion, Test_confusion
 
 
 def train_roi(is_gpu_run=False):
@@ -481,7 +525,7 @@ def train_roi(is_gpu_run=False):
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': 32,
-                    'nb_epoch': 500,
+                    'nb_epoch': 50,
                     'learning_rate': 0.001,
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
@@ -510,34 +554,30 @@ def train_roi(is_gpu_run=False):
     print("Final validation loss = {0:.8f}".format(val_loss))
     print("Final test loss = {0:.8f}".format(test_loss))
 
-    train_preds = (network.forward(x_train_res)).detach().numpy().argmax(axis=1).squeeze()
+    train_preds = (network.forward(x_train_res)).detach().numpy()
+    train_preds = softmax(train_preds).argmax(axis=1).squeeze()
     train_targ = y_train_res.argmax(axis=1).squeeze()
 
-    conf_matrix=confusion_matrix(train_targ,train_preds)
-    recall=recall_calculator(conf_matrix)
-    precision=precision_calculator(conf_matrix)
-    f1=f1_score_calculator(precision,recall)
-
-    Train_confusion = {
-    "Train Confusion Matrix" + "\n" : conf_matrix,
-    'Recall': recall,
-    'Precision' : precision,
-    'F1' : f1}
-
-    val_preds = (network.forward(x_val_pre)).detach().numpy().argmax(axis=1).squeeze()
+    val_preds = (network.forward(x_val_pre)).detach().numpy()
+    val_preds = softmax(val_preds).argmax(axis=1).squeeze()
     val_targ = y_val.argmax(axis=1).squeeze()
 
-    conf_matrix=confusion_matrix(val_targ,val_preds)
-    recall=recall_calculator(conf_matrix)
-    precision=precision_calculator(conf_matrix)
-    f1=f1_score_calculator(precision,recall)
+    test_preds = (network.forward(x_test_pre)).detach().numpy()
+    test_preds = softmax(test_preds).argmax(axis=1).squeeze()
+    test_targ = y_test.argmax(axis=1).squeeze()
 
-    Val_confusion = {
-    "Val Confusion Matrix" + "\n"  : conf_matrix,
-    'Recall' : recall,
-    'Precision' : precision,
-    'F1' : f1}
+    train_accuracy = (train_preds == train_targ).mean()
+    val_accuracy = (val_preds == val_targ).mean()
+    test_accuracy = (test_preds == test_targ).mean()
 
+    losses={"Train Loss": train_loss,
+            "Validation Loss": val_loss,
+            "Test Loss": test_loss,
+            "Train Accuracy": train_accuracy,
+            "Validation Accuracy": val_accuracy,
+            "Test Accuracy": test_accuracy}
+
+    Train_confusion, Val_confusion, Test_confusion = confusion_matrices(train_preds,train_targ,val_preds,val_targ,test_preds,test_targ)
 
     # Save model + hyperparamers to file
     save_training_output(network,
@@ -546,15 +586,49 @@ def train_roi(is_gpu_run=False):
                          hyper_params,
                          output_path,
                          readable_time,
-                         train_loss,
-                         val_loss,
-                         test_loss)
+                         losses,
+                         Train_confusion,
+                         Val_confusion,
+                         Test_confusion)
+
+    # Plot loss and accuracy vs number of epochs
+    # to check how well model is training (e.g. is there overfitting)
+    plt.figure(figsize=(20,10))
+    plt.suptitle("Loss and accuracy vs epochs for " + hyper_params['loss_fun'])
+    # Description of the hyperparams
+    hyperparams_text = "Hyperparameters: \n " + \
+                 "- lr = " + str(hyper_params['learning_rate']) + \
+                 "\n - batch_size = " + str(hyper_params['batch_size']) + \
+                 "\n - loss function = " + hyper_params['loss_fun'] + \
+                 "\n - number of epochs = " + str(hyper_params['nb_epoch'])
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    plt.figtext(0.75, 0.75, hyperparams_text, bbox=props)
+
+    # Plot loss vs number of epochs
+    plt.subplot(2, 1, 1)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.training_losses)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.validation_losses)
+    plt.legend(['training', 'validation'], loc='upper left')
+    plt.xlabel("Number of epochs")
+    plt.ylabel("Loss (" + hyper_params['loss_fun'] + ")")
+
+    # Plot accuracy vs number of epochs
+    plt.subplot(2, 1, 2)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.training_accuracies)
+    plt.plot(trainer.epochs_w_loss_measure, trainer.validation_accuracies)
+    plt.legend(['training', 'validation'], loc='upper left')
+    plt.xlabel("Number of epochs")
+    plt.ylabel("Accuracy (" + hyper_params['loss_fun'] + ")")
+    plt.ylim(0, 1)
+    plt.gca().set_yticklabels(['{:.0f}%'.format(x*100) for x in plt.gca().get_yticks()]) 
+    plt.savefig(output_path + "/" + hyper_params['loss_fun'] + "_loss_plot.png")
+
 
 
 def optimise_fm():
     device = "cpu"
-
-    # Load and prepare data
+    
+    # Load and prepare data 
     dataset = np.loadtxt("FM_dataset.dat")
 
     # Split data
@@ -577,7 +651,7 @@ def optimise_fm():
     trainer = TorchTrainer(
         problem_type="regression",
         network=network,
-        batch_size=10,
+        batch_size=1000,
         nb_epoch=900,
         learning_rate=0.01,
         loss_fun="mse",
@@ -633,7 +707,7 @@ def optimise_fm():
 
     # Add the network to a trainer and train
     hyper_params = {'batch_size': optimal_parameters_list[0],
-                    'nb_epoch': 1000,
+                    'nb_epoch': 10,
                     'learning_rate': optimal_parameters_list[1],
                     'loss_fun': "mse",
                     'shuffle_flag': True,
@@ -658,6 +732,7 @@ def optimise_fm():
     train_loss = trainer.eval_loss(x_train_pre, y_train_pre)
     val_loss = trainer.eval_loss(x_val_pre, y_val_pre)
     test_loss = trainer.eval_loss(x_test_pre, y_test_pre)
+    losses={" Train Loss": train_loss, "Validation Loss": val_loss, "Test Loss":test_loss }
 
     print("Optimised train loss = {0:.2f}".format(train_loss))
     print("Optimised validation loss = {0:.2f}".format(val_loss))
@@ -670,16 +745,14 @@ def optimise_fm():
                          hyper_params,
                          output_path,
                          readable_time,
-                         train_loss,
-                         val_loss,
-			             test_loss,
+                         losses,
                          y_preprocessor=y_preproc)
 
 
 def optimise_roi():
     device = "cpu"
-
-    # Load and prepare data
+    
+    # Load and prepare data 
     dataset = np.loadtxt("ROI_dataset.dat")
 
     # Split data
@@ -710,12 +783,13 @@ def optimise_roi():
     )
 
     trainer.set_optimisation(x_train_res, y_train_res, x_val_pre, y_val)
-
+    
     optimisation_parameters = [
         (10,200),
         (0.001, 0.2),
-        (10,100)
-    ]
+        (10,100)]
+
+
 
     result = gp_minimize(trainer.optimise_hyperparameters,
                          optimisation_parameters,
@@ -756,7 +830,7 @@ def optimise_roi():
                     'loss_fun': "cross_entropy",
                     'shuffle_flag': True,
                     'optimizer': "adam"}
-
+    
     trainer = TorchTrainer(
         problem_type="classification",
         network=network,
@@ -769,20 +843,37 @@ def optimise_roi():
         device=device,
         log_output_path=output_path
     )
-
+    
     trainer.train(x_train_res, y_train_res, x_val_pre, y_val)
 
     train_loss = trainer.eval_loss(x_train_res, y_train_res)
     val_loss = trainer.eval_loss(x_val_pre, y_val)
     test_loss = trainer.eval_loss(x_test_pre, y_test)
-
+    
     # Evaluate results
     print("Optimised train loss = {0:.8f}".format(train_loss))
     print("Optimised validation loss = {0:.8f}".format(val_loss))
     print("Optimised test loss = {0:.8f}".format(test_loss))
 
+
+    train_preds = (network.forward(x_train_res)).detach().numpy()
+    train_preds = softmax(train_preds).argmax(axis=1).squeeze()
+    train_targ = y_train_res.argmax(axis=1).squeeze()
+
+    val_preds = (network.forward(x_val_pre)).detach().numpy()
+    val_preds = softmax(val_preds).argmax(axis=1).squeeze()
+    val_targ = y_val.argmax(axis=1).squeeze()
+
+    test_preds = (network.forward(x_test_pre)).detach().numpy()
+    test_preds = softmax(val_preds).argmax(axis=1).squeeze()
+    test_targ = y_test.argmax(axis=1).squeeze()
+
+    Train_confusion, Val_confusion, Test_confusion = confusion_matrices(train_preds,train_targ,val_preds,val_targ,test_preds,test_targ)
+
+    losses={" Train Loss": train_loss, "Validation Loss": val_loss, "Test Loss":test_loss }
+
     # Save model + hyperparamers to file
-    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time, train_loss, val_loss, test_loss)
+    save_training_output(network, layers, train_prep, hyper_params, output_path, readable_time,losses, Train_confusion, Val_confusion, Test_confusion)
 
 
 if __name__ == "__main__":
