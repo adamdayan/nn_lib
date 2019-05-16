@@ -1,5 +1,7 @@
 # README
 
+This was a coursework for CO395 Intro to Machine Learning at Imperial. I've added this repo to my github to demo the parts that I did - anything not committed by me was the work of either my excellent teammates or were skeleton files provided by the course teachers. 
+
 ## FOR REVIEWERS: How to run learn_FM.py and learn_ROI.py
 
 To run these models with the hidden dataset, please run the following
